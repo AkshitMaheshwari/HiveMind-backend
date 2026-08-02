@@ -12,3 +12,6 @@ langchain_community
 yfinance
 # duckduckgo
 langchain_core
+qdrant_client
+langchain_qdrant
+
