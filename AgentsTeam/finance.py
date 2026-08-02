@@ -1,3 +1,5 @@
+from pathlib import Path
+import sys
 import yfinance as yf
 from typing import Dict, Any
 from langchain_openai import ChatOpenAI
@@ -6,6 +8,10 @@ from langchain_core.tools import Tool, tool
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain.agents import create_agent
 # from langgraph.prebuilt import create_react_agent
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 from state import NexusState
 import os
