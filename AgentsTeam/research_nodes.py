@@ -113,11 +113,9 @@ def synthesizer_node(state: ResearchState):
     
     return {"final_answer": response.content}
 
-# ---------------------------------------------------------
-# 3. Build and Compile the Sub-Graph
-# ---------------------------------------------------------
+
 def route_research(state: ResearchState):
-    return f"{state['route']}_research_node" # Returns 'local_research_node' or 'web_research_node'
+    return f"{state['route']}_research_node" 
 
 research_graph = StateGraph(ResearchState)
 
@@ -136,24 +134,22 @@ research_graph.add_edge("synthesizer_node", END)
 
 adaptive_research_team = research_graph.compile()
 
-# ---------------------------------------------------------
-# 4. The Wrapper Node for Nexus Engine
-# ---------------------------------------------------------
+
 def adaptive_research_node(state: NexusState) -> Dict[str, Any]:
     """
     This is the outer node that plugs into your main application. 
     It triggers the internal Sub-Graph we just compiled.
     """
-    # Initialize the sub-graph state
+    
     initial_research_state = {
         "question": state["user_prompt"],
-        "local_chunks": state.get("uploaded_documents", []) # Assuming you add this to NexusState later
+        "local_chunks": state.get("uploaded_documents", [])
     }
     
-    # Run the sub-graph
+  
     final_research_state = adaptive_research_team.invoke(initial_research_state)
     
-    # Pass the final answer back up to the main Nexus Engine state
+  
     return {
         "domain_insights": {
             "adaptive_research_intel": final_research_state["final_answer"]
