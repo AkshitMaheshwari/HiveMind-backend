@@ -1,0 +1,14 @@
+numpy
+openai
+agno
+soundfile
+utils
+pydub
+librosa
+langgraph
+langchain
+langchain_openai
+langchain_community
+yfinance
+# duckduckgo
+langchain_core
