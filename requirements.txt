@@ -17,5 +17,7 @@ langchain_qdrant
 firecrawl
 langchain_google_genai
 e2b_code_interpreter
+composio_langchain
+google-search-results
 
 
