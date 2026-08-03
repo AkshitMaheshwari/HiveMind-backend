@@ -12,9 +12,7 @@ from langgraph.graph import StateGraph, START, END
 
 from state import NexusState
 
-# =============================================================================
-# 1. Output Schemas (Preserved from ADK)
-# =============================================================================
+
 class HeadingItem(BaseModel):
     tag: str = Field(..., description="Heading tag such as h1, h2, h3.")
     text: str = Field(..., description="Text content of the heading.")
@@ -62,9 +60,7 @@ class SerpAnalysis(BaseModel):
     key_themes: List[str] = Field(default_factory=list, description="Notable recurring themes.")
     differentiation_opportunities: List[str] = Field(default_factory=list, description="Opportunities to stand out.")
 
-# =============================================================================
-# 2. Sub-Graph State
-# =============================================================================
+
 class SeoAuditState(TypedDict):
     original_prompt: str
     target_url: str
@@ -72,9 +68,7 @@ class SeoAuditState(TypedDict):
     serp_analysis: Optional[dict]
     final_report: str
 
-# =============================================================================
-# 3. Define the Nodes
-# =============================================================================
+
 llm = ChatOpenAI(model="gpt-4o", temperature=0.1)
 
 def extract_url_node(state: SeoAuditState):
@@ -160,9 +154,7 @@ def optimization_advisor_node(state: SeoAuditState):
 
     return {"final_report": response.content}
 
-# =============================================================================
-# 4. Build and Compile the Sub-Graph
-# =============================================================================
+
 def route_after_audit(state: SeoAuditState) -> str:
     if not state.get("page_audit"):
         return "optimization_advisor" # Skip SERP if audit failed
@@ -183,9 +175,7 @@ seo_graph.add_edge("optimization_advisor", END)
 
 seo_audit_team = seo_graph.compile()
 
-# =============================================================================
-# 5. Wrapper Node for Nexus Engine
-# =============================================================================
+
 def seo_audit_domain_node(state: NexusState) -> Dict[str, Any]:
     """Outer node that plugs into the main Nexus application."""
     initial_state = {
