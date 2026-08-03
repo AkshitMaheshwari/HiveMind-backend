@@ -1,3 +1,5 @@
+import os
+from dotenv import load_dotenv
 from pathlib import Path
 import sys
 from typing import Dict, Any, List, Literal
@@ -7,7 +9,7 @@ from langgraph.graph import StateGraph, START, END
 from langchain_openai import ChatOpenAI
 from langchain_community.tools import DuckDuckGoSearchRun
 from langchain_core.messages import SystemMessage, HumanMessage
-
+load_dotenv()  
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
 	sys.path.insert(0, str(PROJECT_ROOT))
@@ -40,7 +42,7 @@ class VerificationDecision(BaseModel):
 	gaps: List[str] = Field(description = "List of missing information")
 
 
-llm = ChatOpenAI(model="gpt-4o", temperature=0.2)
+llm = ChatOpenAI(model="gpt-4o", temperature=0.2, max_tokens = 800, api_key = os.getenv('OPENAI_API_KEY'), base_url = "https://models.inference.ai.azure.com") 
 
 def triage_node(state: ResearchState):
     """Replaces triage_agent"""

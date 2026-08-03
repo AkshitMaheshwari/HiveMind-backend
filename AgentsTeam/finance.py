@@ -43,7 +43,7 @@ def get_company_news(ticker: str)->str:
 
 finance_tools = [get_current_stock_price, get_company_info, get_company_news]
 
-llm = ChatOpenAI(model_name = "gpt-4.1",temperature=0.1, max_tokens=500,api_key = os.getenv("OPENAI_API_KEY"),base_url = "https://models.inference.ai.azure.com")
+llm = ChatOpenAI(model_name = "gpt-4o",temperature=0.1, max_tokens=500,api_key = os.getenv("OPENAI_API_KEY"),base_url = "https://models.inference.ai.azure.com")
 
 web_agent = create_agent(
     model = llm,
