@@ -14,4 +14,4 @@ yfinance
 langchain_core
 qdrant_client
 langchain_qdrant
-
+firecrawl
