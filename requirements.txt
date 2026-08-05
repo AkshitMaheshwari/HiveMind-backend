@@ -1,23 +1,36 @@
+# Core LangGraph & LangChain
+langgraph>=0.2.0
+langchain>=0.3.0
+langchain-core>=0.3.0
+langchain-community>=0.3.0
+
+# LLM providers
+langchain-google-genai>=2.0.0
+langchain-openai>=0.2.0
+langchain-groq>=0.2.0
+
+# FastAPI + WebSocket
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+websockets>=12.0
+python-multipart>=0.0.9
+
+# Tools
+tavily-python>=0.3.0
+duckduckgo-search>=6.0.0
+firecrawl-py>=0.0.16
+
+# Code sandbox
+e2b-code-interpreter>=0.0.10
+
+# Utilities
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+httpx>=0.27.0
+
+# Vector DB (future memory layer)
+qdrant-client>=1.9.0
+
+# Existing deps
 numpy
-openai
-agno
-soundfile
-utils
-pydub
-librosa
-langgraph
-langchain
-langchain_openai
-langchain_community
 yfinance
-# duckduckgo
-langchain_core
-qdrant_client
-langchain_qdrant
-firecrawl
-langchain_google_genai
-e2b_code_interpreter
-composio_langchain
-google-search-results
-
-
