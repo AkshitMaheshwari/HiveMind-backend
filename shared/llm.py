@@ -14,11 +14,12 @@ load_dotenv()
 @lru_cache(maxsize=None)
 def get_gemini_flash():
     """Fast Gemini model for routing and lightweight tasks."""
-    from langchain_google_genai import ChatGoogleGenerativeAI
-    return ChatGoogleGenerativeAI(
-        model="gemini-2.0-flash",
-        google_api_key=os.getenv("GOOGLE_API_KEY"),
+    # from langchain_google_genai import ChatGoogleGenerativeAI
+    return ChatOpenAI(
+        model="gpt-4o",
+        api_key=os.getenv("OPENAI_API_KEY"),
         temperature=0.1,
+        base_url = "https://models.inference.ai.azure.com"
     )
 
 
