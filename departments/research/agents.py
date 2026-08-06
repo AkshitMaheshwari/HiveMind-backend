@@ -50,19 +50,25 @@ class ArxivResearchAgent(ProductionAgent):
             raw_arxiv = arxiv_search(task, max_results=5)
 
             prompt = f"Research question: {task}\n\narXiv Search Results:\n{raw_arxiv}"
-            result: SearchDraft = self._invoke_structured(prompt, SearchDraft)
+            try:
+                result: SearchDraft = self._invoke_structured(prompt, SearchDraft)
+                draft_content = result.draft_answer if result and result.draft_answer else raw_arxiv
+                evidence_list = [e.model_dump() for e in result.evidence] if result and result.evidence else []
+            except Exception:
+                draft_content = raw_arxiv
+                evidence_list = []
 
             evidence_text = "\n".join([
-                f"• [{e.source}]: {e.summary}" for e in result.evidence
-            ])
+                f"• [{e.get('source', 'arXiv')}]: {e.get('summary', '')}" for e in evidence_list
+            ]) if evidence_list else raw_arxiv[:500]
 
             return AgentOutput(
                 agent_name=self.name,
                 department=self.department,
                 success=True,
-                content=result.draft_answer,
+                content=draft_content,
                 metadata={
-                    "evidence": [e.model_dump() for e in result.evidence],
+                    "evidence": evidence_list,
                     "raw_results": raw_arxiv,
                     "evidence_formatted": evidence_text,
                 },
@@ -93,19 +99,25 @@ class WikipediaAgent(ProductionAgent):
             raw_wiki = wikipedia_search(task, max_results=3)
 
             prompt = f"Research topic: {task}\n\nWikipedia Search Results:\n{raw_wiki}"
-            result: SearchDraft = self._invoke_structured(prompt, SearchDraft)
+            try:
+                result: SearchDraft = self._invoke_structured(prompt, SearchDraft)
+                draft_content = result.draft_answer if result and result.draft_answer else raw_wiki
+                evidence_list = [e.model_dump() for e in result.evidence] if result and result.evidence else []
+            except Exception:
+                draft_content = raw_wiki
+                evidence_list = []
 
             evidence_text = "\n".join([
-                f"• [{e.source}]: {e.summary}" for e in result.evidence
-            ])
+                f"• [{e.get('source', 'Wikipedia')}]: {e.get('summary', '')}" for e in evidence_list
+            ]) if evidence_list else raw_wiki[:500]
 
             return AgentOutput(
                 agent_name=self.name,
                 department=self.department,
                 success=True,
-                content=result.draft_answer,
+                content=draft_content,
                 metadata={
-                    "evidence": [e.model_dump() for e in result.evidence],
+                    "evidence": evidence_list,
                     "raw_results": raw_wiki,
                     "evidence_formatted": evidence_text,
                 },
@@ -140,21 +152,26 @@ class WebSearchAgent(ProductionAgent):
             # Run web search
             raw_results = web_search(task, max_results=6)
 
-            # Use structured output to extract evidence
             prompt = f"Research question: {task}\n\nWeb search results:\n{raw_results}"
-            result: SearchDraft = self._invoke_structured(prompt, SearchDraft)
+            try:
+                result: SearchDraft = self._invoke_structured(prompt, SearchDraft)
+                draft_content = result.draft_answer if result and result.draft_answer else raw_results
+                evidence_list = [e.model_dump() for e in result.evidence] if result and result.evidence else []
+            except Exception:
+                draft_content = raw_results
+                evidence_list = []
 
             evidence_text = "\n".join([
-                f"• [{e.source}]: {e.summary}" for e in result.evidence
-            ])
+                f"• [{e.get('source', 'Web')}]: {e.get('summary', '')}" for e in evidence_list
+            ]) if evidence_list else raw_results[:500]
 
             return AgentOutput(
                 agent_name=self.name,
                 department=self.department,
                 success=True,
-                content=result.draft_answer,
+                content=draft_content,
                 metadata={
-                    "evidence": [e.model_dump() for e in result.evidence],
+                    "evidence": evidence_list,
                     "raw_results": raw_results,
                     "evidence_formatted": evidence_text,
                 },
@@ -222,6 +239,8 @@ Please synthesize a comprehensive, publication-grade Deep Academic Research Repo
 
         try:
             final_report = self._invoke(prompt)
+            if not final_report or not str(final_report).strip():
+                final_report = f"# Research Report: {task}\n\n" + (web_draft or arxiv_draft or wiki_draft or raw_results)
             return AgentOutput(
                 agent_name=self.name,
                 department=self.department,
@@ -229,11 +248,12 @@ Please synthesize a comprehensive, publication-grade Deep Academic Research Repo
                 content=final_report,
             )
         except Exception as e:
+            fallback_report = f"# Research Report: {task}\n\n" + (web_draft or arxiv_draft or wiki_draft or raw_results or f"Research processing error: {e}")
             return AgentOutput(
                 agent_name=self.name,
                 department=self.department,
                 success=False,
-                content=web_draft or arxiv_draft,  # Return fallback
+                content=fallback_report,
                 error=str(e),
             )
 

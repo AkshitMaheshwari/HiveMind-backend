@@ -11,82 +11,81 @@ load_dotenv()
 logger = logging.getLogger("llm_factory")
 
 
+class ResilientLLM:
+    """Wraps multiple LLMs in a fallback chain to handle 429 quota / rate limit errors automatically."""
+    def __init__(self, llms: list):
+        self.llms = [l for l in llms if l is not None]
+
+    def invoke(self, messages, **kwargs):
+        last_err = None
+        for llm in self.llms:
+            try:
+                return llm.invoke(messages, **kwargs)
+            except Exception as e:
+                logger.warning(f"LLM invocation failed on model {getattr(llm, 'model', 'unknown')}: {e}. Retrying with next model...")
+                last_err = e
+        raise last_err or RuntimeError("All LLM models in resilient chain failed.")
+
+    def with_structured_output(self, schema, **kwargs):
+        structured_llms = []
+        for l in self.llms:
+            try:
+                structured_llms.append(l.with_structured_output(schema, **kwargs))
+            except Exception:
+                pass
+        return ResilientLLM(structured_llms)
+
+
 def get_llm(api_keys: Optional[Dict[str, str]] = None, model_type: str = "general"):
     """
-    Selects LLM based on user-provided keys or system defaults.
-    Priority:
-    1. User Google Gemini Key -> Gemini 2.0 Flash
-    2. User OpenAI Key -> GPT-4o
-    3. User Groq Key -> Llama 3.3 70B
-    4. Default Server Groq Key -> Llama 3.3 70B
-    5. Default Server Google Key -> Gemini 2.0 Flash
+    Builds a ResilientLLM chain based on user-provided keys or system defaults.
+    Candidates across independent quota buckets:
+    1. Google Gemini 2.0 Flash
+    2. Google Gemini 2.0 Flash Lite
+    3. Google Gemini 1.5 Pro
+    4. Groq Llama 3.1 8B Instant (500k TPD limit)
+    5. Groq Llama 3.3 70B Versatile (100k TPD limit)
+    6. OpenAI GPT-4o (if sk- key provided)
     """
     api_keys = api_keys or {}
     google_key = api_keys.get("google_api_key") or os.getenv("GOOGLE_API_KEY")
     openai_key = api_keys.get("openai_api_key") or os.getenv("OPENAI_API_KEY")
     groq_key = api_keys.get("groq_api_key") or os.getenv("GROQ_API_KEY")
 
-    # 1. User-supplied Google Gemini key
-    if api_keys.get("google_api_key"):
-        try:
-            from langchain_google_genai import ChatGoogleGenerativeAI
-            return ChatGoogleGenerativeAI(
-                model="gemini-2.0-flash",
-                google_api_key=api_keys["google_api_key"].strip(),
-                temperature=0.2 if model_type in ("routing", "verification") else 0.4,
-            )
-        except Exception as e:
-            logger.warning(f"User Google Gemini key initialization failed: {e}. Falling back to Groq.")
+    candidates = []
+    temp = 0.2 if model_type in ("routing", "verification") else 0.4
 
-    # 2. User-supplied OpenAI key
-    if api_keys.get("openai_api_key"):
-        try:
-            from langchain_openai import ChatOpenAI
-            return ChatOpenAI(
-                model="gpt-4o",
-                api_key=api_keys["openai_api_key"].strip(),
-                temperature=0.2 if model_type in ("routing", "verification") else 0.4,
-            )
-        except Exception as e:
-            logger.warning(f"User OpenAI key initialization failed: {e}. Falling back to Groq.")
-
-    # 3. User-supplied Groq key
-    if api_keys.get("groq_api_key"):
-        try:
-            from langchain_groq import ChatGroq
-            return ChatGroq(
-                model="llama-3.3-70b-versatile",
-                groq_api_key=api_keys["groq_api_key"].strip(),
-                temperature=0.1,
-                max_tokens=2000,
-            )
-        except Exception as e:
-            logger.warning(f"User Groq key initialization failed: {e}. Falling back to default server key.")
-
-    # 4. Default Server Groq key
-    if groq_key and not groq_key.startswith("your-"):
-        try:
-            from langchain_groq import ChatGroq
-            return ChatGroq(
-                model="llama-3.3-70b-versatile",
-                groq_api_key=groq_key.strip(),
-                temperature=0.1,
-                max_tokens=2000,
-            )
-        except Exception as e:
-            logger.warning(f"Server Groq key failed: {e}")
-
-    # 5. Default Server Google key
+    # 1. Google Gemini Candidates
     if google_key and not google_key.startswith("your-"):
         try:
             from langchain_google_genai import ChatGoogleGenerativeAI
-            return ChatGoogleGenerativeAI(
-                model="gemini-2.0-flash",
-                google_api_key=google_key.strip(),
-                temperature=0.4,
-            )
+            g_key = google_key.strip()
+            candidates.append(ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key=g_key, temperature=temp))
+            candidates.append(ChatGoogleGenerativeAI(model="gemini-2.0-flash-lite", google_api_key=g_key, temperature=temp))
+            candidates.append(ChatGoogleGenerativeAI(model="gemini-1.5-pro", google_api_key=g_key, temperature=temp))
         except Exception as e:
-            logger.warning(f"Server Google key failed: {e}")
+            logger.warning(f"Google Gemini initialization error: {e}")
+
+    # 2. Groq Candidates (8b instant has 500k TPD bucket; 70b has 100k TPD bucket)
+    if groq_key and not groq_key.startswith("your-"):
+        try:
+            from langchain_groq import ChatGroq
+            gq_key = groq_key.strip()
+            candidates.append(ChatGroq(model="llama-3.1-8b-instant", groq_api_key=gq_key, temperature=0.1, max_tokens=2000))
+            candidates.append(ChatGroq(model="llama-3.3-70b-versatile", groq_api_key=gq_key, temperature=0.1, max_tokens=2000))
+        except Exception as e:
+            logger.warning(f"Groq initialization error: {e}")
+
+    # 3. OpenAI Candidate (requires valid sk- key)
+    if openai_key and openai_key.startswith("sk-"):
+        try:
+            from langchain_openai import ChatOpenAI
+            candidates.append(ChatOpenAI(model="gpt-4o", api_key=openai_key.strip(), temperature=temp))
+        except Exception as e:
+            logger.warning(f"OpenAI initialization error: {e}")
+
+    if candidates:
+        return ResilientLLM(candidates)
 
     raise ValueError("No valid API key available! Please enter a Gemini, OpenAI, or Groq API key in Settings.")
 

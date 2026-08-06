@@ -73,34 +73,46 @@ CREATE TABLE IF NOT EXISTS public.task_events (
 CREATE INDEX IF NOT EXISTS idx_task_events_task_id ON public.task_events(task_id, id ASC);
 
 
--- 4. Row Level Security (RLS) Policies
+-- 4. Helper Function to Prevent Infinite RLS Recursion
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM public.profiles
+        WHERE id = auth.uid() AND role = 'admin'
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
+
+
+-- 5. Row Level Security (RLS) Policies
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.task_events ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies to cleanly recreate
+DROP POLICY IF EXISTS "Users can read own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Admins can read all profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Users can select own tasks" ON public.tasks;
+DROP POLICY IF EXISTS "Users can insert own tasks" ON public.tasks;
+DROP POLICY IF EXISTS "Users can update own tasks" ON public.tasks;
+DROP POLICY IF EXISTS "Admins can read all tasks" ON public.tasks;
+DROP POLICY IF EXISTS "Users can select task_events" ON public.task_events;
+DROP POLICY IF EXISTS "Users can insert task_events" ON public.task_events;
+
 -- Profiles: Users can read own profile; Admins can read all profiles
 CREATE POLICY "Users can read own profile" ON public.profiles
-    FOR SELECT USING (auth.uid() = id);
-
-CREATE POLICY "Admins can read all profiles" ON public.profiles
-    FOR SELECT USING (
-        EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
-    );
+    FOR SELECT USING (auth.uid() = id OR public.is_admin());
 
 -- Tasks: Users can read & write ONLY their own tasks; Admins can read all
 CREATE POLICY "Users can select own tasks" ON public.tasks
-    FOR SELECT USING (auth.uid() = user_id);
+    FOR SELECT USING (auth.uid() = user_id OR public.is_admin());
 
 CREATE POLICY "Users can insert own tasks" ON public.tasks
     FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "Users can update own tasks" ON public.tasks
-    FOR UPDATE USING (auth.uid() = user_id);
-
-CREATE POLICY "Admins can read all tasks" ON public.tasks
-    FOR SELECT USING (
-        EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
-    );
+    FOR UPDATE USING (auth.uid() = user_id OR public.is_admin());
 
 -- Task Events: Users can only view & insert events for their own tasks
 CREATE POLICY "Users can select task_events" ON public.task_events
@@ -108,7 +120,7 @@ CREATE POLICY "Users can select task_events" ON public.task_events
         EXISTS (
             SELECT 1 FROM public.tasks
             WHERE public.tasks.id = public.task_events.task_id
-            AND public.tasks.user_id = auth.uid()
+            AND (public.tasks.user_id = auth.uid() OR public.is_admin())
         )
     );
 
@@ -117,6 +129,6 @@ CREATE POLICY "Users can insert task_events" ON public.task_events
         EXISTS (
             SELECT 1 FROM public.tasks
             WHERE public.tasks.id = public.task_events.task_id
-            AND public.tasks.user_id = auth.uid()
+            AND (public.tasks.user_id = auth.uid() OR public.is_admin())
         )
     );

@@ -86,15 +86,6 @@ async def run_task_async(task_id: str, user_request: str, conversation_id: str, 
 
         final_output = final_state.get("final_output", "Task completed.")
 
-        # Send final output event
-        await manager.broadcast(task_id, {
-            "event": "final_output",
-            "data": final_output,
-            "department": None,
-            "agent": "CEO",
-            "timestamp": datetime.utcnow().isoformat(),
-        })
-
         # Update DB task record
         await db_service.update_task(task_id, {
             "status": "done",

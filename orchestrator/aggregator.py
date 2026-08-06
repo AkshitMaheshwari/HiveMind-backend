@@ -42,7 +42,10 @@ def aggregator_node(state: OrchestratorState) -> Dict[str, Any]:
     # If only one department ran, return its output directly
     if len(department_outputs) == 1:
         dept, output = list(department_outputs.items())[0]
-        final = f"# 📋 Output\n\n{output}"
+        output_str = str(output).strip() if output else ""
+        if not output_str:
+            output_str = f"No specific report content was returned by the {dept} department."
+        final = output_str if output_str.startswith("#") else f"# 📋 Output\n\n{output_str}"
         events.append({
             "event": "final_output",
             "data": final,
