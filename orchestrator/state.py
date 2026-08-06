@@ -31,6 +31,7 @@ class OrchestratorState(TypedDict):
     # ── Input ──────────────────────────────────────────────────────
     user_request: str
     conversation_id: str
+    api_keys: Optional[Dict[str, str]]
 
     # ── CEO Routing ────────────────────────────────────────────────
     task_plan: Optional[Dict[str, Any]]       # CEO's JSON task plan

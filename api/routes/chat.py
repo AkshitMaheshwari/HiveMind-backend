@@ -1,25 +1,32 @@
 """
 Chat API routes — POST /api/chat to start a task, GET /api/task/{id} to poll.
+Integrated with Supabase PostgreSQL Database Service for persistent storage.
 """
 import asyncio
 import uuid
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Depends
 from pydantic import BaseModel
 
 from api.websocket.stream import manager
+from db.supabase_client import db_service
+from api.auth import get_optional_user, require_authenticated_user, require_admin_user
 
 router = APIRouter()
 
-# In-memory task store (replace with Redis/DB for production)
-task_store: Dict[str, Any] = {}
+
+class ApiKeys(BaseModel):
+    google_api_key: Optional[str] = None
+    openai_api_key: Optional[str] = None
+    groq_api_key: Optional[str] = None
 
 
 class ChatRequest(BaseModel):
     message: str
     conversation_id: str = "default"
+    api_keys: Optional[ApiKeys] = None
 
 
 class ChatResponse(BaseModel):
@@ -28,9 +35,9 @@ class ChatResponse(BaseModel):
     message: str
 
 
-async def run_task_async(task_id: str, user_request: str, conversation_id: str):
+async def run_task_async(task_id: str, user_request: str, conversation_id: str, api_keys: Optional[Dict[str, str]] = None):
     """
-    Runs the orchestrator in a background thread and streams events via WebSocket.
+    Runs the orchestrator in a background thread, updates DB, and streams events via WebSocket.
     """
     import sys
     from pathlib import Path
@@ -38,7 +45,7 @@ async def run_task_async(task_id: str, user_request: str, conversation_id: str):
     if str(backend_root) not in sys.path:
         sys.path.insert(0, str(backend_root))
 
-    task_store[task_id]["status"] = "running"
+    await db_service.update_task(task_id, {"status": "running"})
 
     try:
         # Run in a thread pool to avoid blocking the event loop
@@ -49,6 +56,7 @@ async def run_task_async(task_id: str, user_request: str, conversation_id: str):
             initial_state = {
                 "user_request": user_request,
                 "conversation_id": conversation_id,
+                "api_keys": api_keys,
                 "task_plan": None,
                 "active_departments": [],
                 "completed_departments": [],
@@ -63,24 +71,35 @@ async def run_task_async(task_id: str, user_request: str, conversation_id: str):
 
         final_state = await loop.run_in_executor(None, _run)
 
-        # Stream all events to connected WebSocket clients
+        # Stream all events to connected WebSocket clients and save to DB
         events = final_state.get("agent_events", [])
+        for ev in events:
+            await db_service.save_event(
+                task_id=task_id,
+                event_type=ev.get("event", "event"),
+                department=ev.get("department"),
+                agent=ev.get("agent"),
+                data=ev.get("data"),
+            )
+
         await manager.send_events(task_id, events)
+
+        final_output = final_state.get("final_output", "Task completed.")
 
         # Send final output event
         await manager.broadcast(task_id, {
             "event": "final_output",
-            "data": final_state.get("final_output", "Task completed."),
+            "data": final_output,
             "department": None,
             "agent": "CEO",
             "timestamp": datetime.utcnow().isoformat(),
         })
 
-        # Update task store
-        task_store[task_id].update({
+        # Update DB task record
+        await db_service.update_task(task_id, {
             "status": "done",
-            "final_output": final_state.get("final_output", ""),
-            "events": events,
+            "final_output": final_output,
+            "task_plan": final_state.get("task_plan"),
             "completed_at": datetime.utcnow().isoformat(),
         })
 
@@ -93,7 +112,7 @@ async def run_task_async(task_id: str, user_request: str, conversation_id: str):
 
     except Exception as e:
         error_msg = str(e)
-        task_store[task_id].update({"status": "error", "error": error_msg})
+        await db_service.update_task(task_id, {"status": "error", "error": error_msg})
         await manager.broadcast(task_id, {
             "event": "error",
             "data": error_msg,
@@ -102,25 +121,30 @@ async def run_task_async(task_id: str, user_request: str, conversation_id: str):
 
 
 @router.post("/chat", response_model=ChatResponse)
-async def start_chat(request: ChatRequest, background_tasks: BackgroundTasks):
-    """Start a new orchestrated task. Returns a task_id for WebSocket connection."""
+async def start_chat(
+    request: ChatRequest,
+    background_tasks: BackgroundTasks,
+    user: Dict[str, Any] = Depends(require_authenticated_user),
+):
+    """Start a new orchestrated task linked to user_id. Returns a task_id for WebSocket connection."""
     task_id = str(uuid.uuid4())
+    user_id = user.get("id") if user else None
 
-    task_store[task_id] = {
-        "task_id": task_id,
-        "user_request": request.message,
-        "conversation_id": request.conversation_id,
-        "status": "queued",
-        "created_at": datetime.utcnow().isoformat(),
-        "final_output": None,
-        "events": [],
-    }
+    api_keys_dict = request.api_keys.model_dump(exclude_none=True) if request.api_keys else None
+
+    await db_service.create_task(
+        task_id=task_id,
+        user_request=request.message,
+        conversation_id=request.conversation_id,
+        user_id=user_id,
+    )
 
     background_tasks.add_task(
         run_task_async,
         task_id,
         request.message,
         request.conversation_id,
+        api_keys_dict,
     )
 
     return ChatResponse(
@@ -131,22 +155,41 @@ async def start_chat(request: ChatRequest, background_tasks: BackgroundTasks):
 
 
 @router.get("/task/{task_id}")
-async def get_task_status(task_id: str):
-    """Poll task status and get final output when done."""
-    if task_id not in task_store:
+async def get_task_status(
+    task_id: str,
+    user: Dict[str, Any] = Depends(require_authenticated_user),
+):
+    """Fetch task status, metadata, and event history from DB for the authenticated user."""
+    user_id = user.get("id") if user else None
+    task_data = await db_service.get_task(task_id, user_id=user_id)
+    if not task_data:
         return {"error": "Task not found"}
-    return task_store[task_id]
+    return task_data
 
 
 @router.get("/tasks")
-async def list_tasks():
-    """List all tasks in the current session."""
+async def list_tasks(
+    conversation_id: str = None,
+    user: Dict[str, Any] = Depends(require_authenticated_user),
+):
+    """List recent tasks belonging to the current authenticated user."""
+    user_id = user.get("id") if user else None
+    tasks = await db_service.list_tasks(limit=50, conversation_id=conversation_id, user_id=user_id)
     return [
         {
-            "task_id": t["task_id"],
-            "user_request": t["user_request"][:80],
-            "status": t["status"],
-            "created_at": t["created_at"],
+            "task_id": t.get("id") or t.get("task_id"),
+            "user_request": (t.get("user_request") or "")[:80],
+            "status": t.get("status"),
+            "created_at": t.get("created_at"),
         }
-        for t in task_store.values()
+        for t in tasks
     ]
+
+
+@router.get("/admin/tasks")
+async def list_admin_tasks(admin_user: Dict[str, Any] = Depends(require_admin_user)):
+    """Admin endpoint: List all tasks across all users in the system."""
+    tasks = await db_service.list_admin_all_tasks(limit=100)
+    return tasks
+
+

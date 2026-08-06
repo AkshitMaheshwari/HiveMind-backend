@@ -29,13 +29,15 @@ class SubTask(BaseModel):
 
 class TaskPlanOutput(BaseModel):
     departments: List[Literal["research", "content", "code"]] = Field(
-        description="List of departments needed, in execution order"
+        default_factory=list,
+        description="List of departments needed, in execution order. Empty list if clarification_needed is True."
     )
-    sequence: Literal["sequential", "parallel"] = Field(
-        description="'sequential' if tasks depend on each other, 'parallel' if independent"
+    sequence: Optional[Literal["sequential", "parallel"]] = Field(
+        default="sequential",
+        description="'sequential' if tasks depend on each other, 'parallel' if independent. Always set to 'sequential' or 'parallel', never null."
     )
-    subtasks: List[SubTask] = Field(description="Specific sub-tasks for each department")
-    reasoning: str = Field(description="Brief explanation of why these departments were chosen")
+    subtasks: List[SubTask] = Field(default_factory=list, description="Specific sub-tasks for each department")
+    reasoning: str = Field(default="", description="Brief explanation of why these departments were chosen")
     clarification_needed: bool = Field(
         default=False, description="True if the request is too ambiguous to route"
     )
@@ -60,18 +62,20 @@ CEO_SYSTEM_PROMPT = """You are the CEO of an AI company with three departments:
 
 Your job is to analyze the user's request and output a structured JSON task plan.
 
-Rules:
+CRITICAL RULES (ALWAYS follow these):
+- The "sequence" field MUST always be either "sequential" or "parallel" — NEVER null or empty.
+- If clarification_needed is True, still set sequence="sequential" and departments=[] and subtasks=[].
 - Pick ONLY the departments actually needed (1-3)
 - If research is needed BEFORE content (e.g. "research X then write about it"), sequence="sequential" and content's depends_on="research"
 - If tasks are independent, sequence="parallel"
-- If the request is too vague (e.g. "help me"), set clarification_needed=True
+- If the request is too vague (single word like "hello", "hi", "help me"), set clarification_needed=True, sequence="sequential", departments=[], subtasks=[]
 - Your reasoning should be 1-2 sentences max
 
 Examples:
-- "Write a blog post about AI trends" → [content] (content team can handle this without research)
-- "Research competitors and write a comparison" → [research, content], sequential
-- "Fix this Python bug" → [code]
-- "Research market trends, write a report, and build a scraper" → [research, content, code], parallel
+- "Write a blog post about AI trends" → departments=["content"], sequence="parallel"
+- "Research competitors and write a comparison" → departments=["research", "content"], sequence="sequential"
+- "Fix this Python bug" → departments=["code"], sequence="parallel"
+- "hello" → clarification_needed=True, sequence="sequential", departments=[]
 """
 
 
@@ -94,7 +98,7 @@ def ceo_router_node(state: OrchestratorState) -> Dict[str, Any]:
     """
     from shared.llm import ceo_llm
 
-    llm = ceo_llm()
+    llm = ceo_llm(state.get("api_keys"))
     structured_llm = llm.with_structured_output(TaskPlanOutput)
 
     events = emit_event(state, "ceo_planning", "CEO is analyzing your request...")

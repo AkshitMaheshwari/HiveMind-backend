@@ -29,10 +29,10 @@ class ProductionAgent:
     department: str = "unknown"
     system_prompt: str = "You are a helpful AI assistant."
 
-    def __init__(self, llm=None):
+    def __init__(self, llm=None, api_keys: Optional[Dict[str, str]] = None):
         if llm is None:
             from shared.llm import worker_llm
-            self._llm = worker_llm()
+            self._llm = worker_llm(api_keys)
         else:
             self._llm = llm
 

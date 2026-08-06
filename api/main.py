@@ -10,13 +10,16 @@ _BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(_BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(_BACKEND_ROOT))
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from typing import Optional
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from api.routes.chat import router as chat_router
 from api.websocket.stream import manager
+from api.auth import verify_token
+from db.supabase_client import db_service
 
 
 # ─── FastAPI App ──────────────────────────────────────────────────────────────
@@ -42,11 +45,24 @@ app.include_router(chat_router, prefix="/api", tags=["Chat"])
 
 # ─── WebSocket ────────────────────────────────────────────────────────────────
 @app.websocket("/ws/{task_id}")
-async def websocket_endpoint(websocket: WebSocket, task_id: str):
+async def websocket_endpoint(websocket: WebSocket, task_id: str, token: Optional[str] = Query(None)):
     """
     WebSocket endpoint for real-time agent event streaming.
-    Client connects to /ws/{task_id} after calling POST /api/chat.
+    Client connects to /ws/{task_id}?token={bearer_token} after calling POST /api/chat.
     """
+    user = await verify_token(token) if token else None
+    user_id = user.get("id") if user else None
+
+    # Enforce task ownership when Supabase is connected
+    if db_service.is_connected:
+        if not user_id:
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Authentication required")
+            return
+        task = await db_service.get_task(task_id, user_id=user_id)
+        if not task:
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Unauthorized or task not found")
+            return
+
     await manager.connect(task_id, websocket)
     try:
         # Keep connection alive; events are pushed by background task

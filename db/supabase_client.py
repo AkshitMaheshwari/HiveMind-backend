@@ -1,0 +1,209 @@
+"""
+Supabase PostgreSQL Database Client for Universal Multi-Agent Orchestrator.
+Supports live Supabase database storage with fallback to in-memory store if keys are not set.
+"""
+import os
+import json
+import logging
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+from dotenv import load_dotenv
+
+load_dotenv()
+
+logger = logging.getLogger("db_service")
+logger.setLevel(logging.INFO)
+
+
+class SupabaseDatabaseService:
+    def __init__(self):
+        self.supabase_url = os.getenv("SUPABASE_URL")
+        self.supabase_key = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        self.client = None
+        self._in_memory_tasks: Dict[str, Any] = {}
+        self._in_memory_events: Dict[str, List[Dict[str, Any]]] = {}
+
+        if self.supabase_url and self.supabase_key:
+            try:
+                from supabase import create_client, Client
+                self.client: Optional[Client] = create_client(self.supabase_url, self.supabase_key)
+                logger.info("✅ Supabase client initialized successfully")
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to initialize Supabase client: {e}. Falling back to in-memory store.")
+                self.client = None
+        else:
+            logger.info("ℹ️ SUPABASE_URL / SUPABASE_KEY missing in .env. Using in-memory fallback store.")
+
+    @property
+    def is_connected(self) -> bool:
+        return self.client is not None
+
+    async def create_task(self, task_id: str, user_request: str, conversation_id: str = "default", user_id: Optional[str] = None) -> Dict[str, Any]:
+        """Creates a new task entry in the database."""
+        now = datetime.utcnow().isoformat()
+        task_data = {
+            "id": task_id,
+            "user_id": user_id,
+            "conversation_id": conversation_id,
+            "user_request": user_request,
+            "status": "queued",
+            "task_plan": None,
+            "final_output": None,
+            "error": None,
+            "created_at": now,
+            "completed_at": None,
+        }
+
+        if self.client:
+            try:
+                response = self.client.table("tasks").insert(task_data).execute()
+                if response.data:
+                    return response.data[0]
+            except Exception as e:
+                logger.error(f"Error inserting task to Supabase: {e}")
+
+        # Fallback in-memory
+        self._in_memory_tasks[task_id] = task_data
+        self._in_memory_events[task_id] = []
+        return task_data
+
+    async def update_task(self, task_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Updates status, final output, task_plan, or error for an existing task."""
+        if "status" in updates and updates["status"] in ("done", "error") and "completed_at" not in updates:
+            updates["completed_at"] = datetime.utcnow().isoformat()
+
+        if self.client:
+            try:
+                response = self.client.table("tasks").update(updates).eq("id", task_id).execute()
+                if response.data:
+                    return response.data[0]
+            except Exception as e:
+                logger.error(f"Error updating task in Supabase: {e}")
+
+        # Fallback in-memory
+        if task_id in self._in_memory_tasks:
+            self._in_memory_tasks[task_id].update(updates)
+            return self._in_memory_tasks[task_id]
+        return None
+
+    async def save_event(
+        self,
+        task_id: str,
+        event_type: str,
+        department: Optional[str] = None,
+        agent: Optional[str] = None,
+        data: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Saves a streaming execution event for a task."""
+        now = datetime.utcnow().isoformat()
+        event_data = {
+            "task_id": task_id,
+            "event_type": event_type,
+            "department": department,
+            "agent": agent,
+            "data": data,
+            "timestamp": now,
+        }
+
+        if self.client:
+            try:
+                self.client.table("task_events").insert(event_data).execute()
+            except Exception as e:
+                logger.error(f"Error saving event to Supabase: {e}")
+
+        # Fallback in-memory
+        if task_id not in self._in_memory_events:
+            self._in_memory_events[task_id] = []
+        self._in_memory_events[task_id].append(event_data)
+        return event_data
+
+    async def get_task(self, task_id: str, user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Retrieves task details and its associated events, enforcing user ownership."""
+        if not user_id and self.is_connected:
+            logger.warning(f"get_task called without user_id for task {task_id}")
+            return None
+
+        task_obj = None
+
+        if self.client:
+            try:
+                query = self.client.table("tasks").select("*").eq("id", task_id)
+                if user_id:
+                    query = query.eq("user_id", user_id)
+                response = query.execute()
+                if response.data:
+                    task_obj = response.data[0]
+                    # Fetch events strictly for this task
+                    events_resp = self.client.table("task_events").select("*").eq("task_id", task_id).order("id").execute()
+                    task_obj["events"] = events_resp.data or []
+                    return task_obj
+                else:
+                    return None
+            except Exception as e:
+                logger.error(f"Error fetching task from Supabase: {e}")
+
+        # Fallback in-memory
+        if task_id in self._in_memory_tasks:
+            task_obj = dict(self._in_memory_tasks[task_id])
+            if user_id and task_obj.get("user_id") and task_obj["user_id"] != user_id:
+                return None
+            task_obj["events"] = self._in_memory_events.get(task_id, [])
+            return task_obj
+
+        return None
+
+    async def list_tasks(self, limit: int = 50, conversation_id: Optional[str] = None, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Lists recent tasks belonging strictly to the specified user."""
+        if not user_id and self.is_connected:
+            logger.warning("list_tasks requested without user_id filter")
+            return []
+
+        if self.client:
+            try:
+                query = self.client.table("tasks").select("*").order("created_at", desc=True).limit(limit)
+                if conversation_id:
+                    query = query.eq("conversation_id", conversation_id)
+                if user_id:
+                    query = query.eq("user_id", user_id)
+                response = query.execute()
+                if response.data:
+                    return response.data
+                return []
+            except Exception as e:
+                logger.error(f"Error listing tasks from Supabase: {e}")
+
+        # Fallback in-memory
+        tasks = list(self._in_memory_tasks.values())
+        if conversation_id:
+            tasks = [t for t in tasks if t.get("conversation_id") == conversation_id]
+        if user_id:
+            tasks = [t for t in tasks if t.get("user_id") == user_id]
+        tasks.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+        return tasks[:limit]
+
+    async def get_user_profile(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Fetches user profile including role (user / admin)."""
+        if self.client:
+            try:
+                resp = self.client.table("profiles").select("*").eq("id", user_id).execute()
+                if resp.data:
+                    return resp.data[0]
+            except Exception as e:
+                logger.error(f"Error fetching profile: {e}")
+        return {"id": user_id, "role": "user", "email": "user@example.com"}
+
+    async def list_admin_all_tasks(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """Lists all system tasks across all users (Admin view)."""
+        if self.client:
+            try:
+                resp = self.client.table("tasks").select("*, profiles(email, role)").order("created_at", desc=True).limit(limit).execute()
+                if resp.data:
+                    return resp.data
+            except Exception as e:
+                logger.error(f"Error fetching admin tasks: {e}")
+
+        return list(self._in_memory_tasks.values())[:limit]
+
+
+# Global database service instance
+db_service = SupabaseDatabaseService()

@@ -58,7 +58,7 @@ def aggregator_node(state: OrchestratorState) -> Dict[str, Any]:
         combined_context += f"## {dept.upper()} DEPARTMENT OUTPUT:\n{output}\n\n---\n\n"
 
     try:
-        llm = ceo_llm()
+        llm = ceo_llm(state.get("api_keys"))
         response = llm.invoke([
             SystemMessage(content=AGGREGATOR_PROMPT),
             HumanMessage(content=combined_context),

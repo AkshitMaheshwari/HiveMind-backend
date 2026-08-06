@@ -16,7 +16,7 @@ load_dotenv()
 
 def test_imports():
     print("Testing imports...")
-    from shared.llm import get_gemini_flash
+    from shared.llm import get_llm
     from shared.tools import web_search
     from orchestrator.state import OrchestratorState
     from orchestrator.ceo_agent import ceo_router_node
