@@ -8,22 +8,32 @@ from typing import Any, Dict
 from langgraph.graph import StateGraph, START, END
 
 from departments.research.state import ResearchDeptState
-from departments.research.agents import WebSearchAgent, SummarizerAgent, FactCheckerAgent
+from departments.research.agents import (
+    ArxivResearchAgent,
+    WikipediaAgent,
+    WebSearchAgent,
+    SummarizerAgent,
+    FactCheckerAgent,
+)
 
 
 # ─── Instantiate agents ───────────────────────────────────────────────────────
+_arxiv_agent = None
+_wikipedia_agent = None
 _web_search_agent = None
 _summarizer_agent = None
 _fact_checker_agent = None
 
 
 def _get_agents():
-    global _web_search_agent, _summarizer_agent, _fact_checker_agent
-    if _web_search_agent is None:
+    global _arxiv_agent, _wikipedia_agent, _web_search_agent, _summarizer_agent, _fact_checker_agent
+    if _arxiv_agent is None:
+        _arxiv_agent = ArxivResearchAgent()
+        _wikipedia_agent = WikipediaAgent()
         _web_search_agent = WebSearchAgent()
         _summarizer_agent = SummarizerAgent()
         _fact_checker_agent = FactCheckerAgent()
-    return _web_search_agent, _summarizer_agent, _fact_checker_agent
+    return _arxiv_agent, _wikipedia_agent, _web_search_agent, _summarizer_agent, _fact_checker_agent
 
 
 def _emit(state: ResearchDeptState, event: str, agent: str, data: str = "") -> list:
@@ -40,34 +50,80 @@ def _emit(state: ResearchDeptState, event: str, agent: str, data: str = "") -> l
 
 # ─── Graph Nodes ──────────────────────────────────────────────────────────────
 
+def arxiv_node(state: ResearchDeptState) -> Dict[str, Any]:
+    """Arxiv Research Agent — searches arXiv for scientific preprints and papers."""
+    arxiv_agent, _, _, _, _ = _get_agents()
+
+    events = _emit(state, "agent_working", "ArxivResearchAgent", "Searching arXiv scientific papers...")
+    output = arxiv_agent.execute(state["task"])
+
+    events = _emit(
+        {**state, "events": events},
+        "agent_done",
+        "ArxivResearchAgent",
+        "arXiv paper analysis complete",
+    )
+
+    return {
+        "arxiv_evidence": output.metadata.get("evidence", []),
+        "events": events,
+    }
+
+
+def wikipedia_node(state: ResearchDeptState) -> Dict[str, Any]:
+    """Wikipedia Agent — searches Wikipedia for background domain context."""
+    _, wikipedia_agent, _, _, _ = _get_agents()
+
+    events = _emit(state, "agent_working", "WikipediaAgent", "Searching Wikipedia knowledge base...")
+    output = wikipedia_agent.execute(state["task"])
+
+    events = _emit(
+        {**state, "events": events},
+        "agent_done",
+        "WikipediaAgent",
+        "Wikipedia background search complete",
+    )
+
+    return {
+        "wikipedia_evidence": output.metadata.get("evidence", []),
+        "events": events,
+    }
+
+
 def web_search_node(state: ResearchDeptState) -> Dict[str, Any]:
-    """Web Search Agent — finds information from the web."""
-    web_search_agent, _, _ = _get_agents()
+    """Web Search Agent — finds real-time web intelligence and documentation."""
+    _, _, web_search_agent, _, _ = _get_agents()
 
-    events = _emit(state, "agent_working", "WebSearchAgent", "Searching the web...")
-
+    events = _emit(state, "agent_working", "WebSearchAgent", "Searching web and technical docs...")
     output = web_search_agent.execute(state["task"])
 
     events = _emit(
         {**state, "events": events},
         "agent_done",
         "WebSearchAgent",
-        "Search complete",
+        "Web intelligence search complete",
     )
+
+    # Combine evidence lists
+    arxiv_ev = state.get("arxiv_evidence", [])
+    wiki_ev = state.get("wikipedia_evidence", [])
+    web_ev = output.metadata.get("evidence", [])
+    all_evidence = arxiv_ev + wiki_ev + web_ev
 
     return {
         "search_results": output.metadata.get("raw_results", ""),
-        "evidence": output.metadata.get("evidence", []),
+        "web_evidence": web_ev,
+        "evidence": all_evidence,
         "draft_answer": output.content,
         "events": events,
     }
 
 
 def fact_checker_node(state: ResearchDeptState) -> Dict[str, Any]:
-    """Fact Checker Agent — verifies the draft and identifies gaps."""
-    _, _, fact_checker_agent = _get_agents()
+    """Fact Checker Agent — verifies draft and checks academic & web evidence."""
+    _, _, _, _, fact_checker_agent = _get_agents()
 
-    events = _emit(state, "agent_working", "FactCheckerAgent", "Verifying claims...")
+    events = _emit(state, "agent_working", "FactCheckerAgent", "Cross-verifying evidence & claims...")
 
     output = fact_checker_agent.execute(
         state["task"],
@@ -92,15 +148,22 @@ def fact_checker_node(state: ResearchDeptState) -> Dict[str, Any]:
 
 
 def synthesizer_node(state: ResearchDeptState) -> Dict[str, Any]:
-    """Summarizer Agent — creates the final polished research report."""
-    _, summarizer_agent, _ = _get_agents()
+    """Summarizer Agent — synthesizes arXiv, Wikipedia, and Web evidence into a Deep Research Report."""
+    _, _, _, summarizer_agent, _ = _get_agents()
 
-    events = _emit(state, "agent_working", "SummarizerAgent", "Synthesizing research...")
+    events = _emit(state, "agent_working", "SummarizerAgent", "Synthesizing Deep Research Report...")
+
+    # Formulate contextual drafts
+    arxiv_text = "\n".join([f"• [{e.get('source')}]: {e.get('summary')}" for e in state.get("arxiv_evidence", [])])
+    wiki_text = "\n".join([f"• [{e.get('source')}]: {e.get('summary')}" for e in state.get("wikipedia_evidence", [])])
 
     output = summarizer_agent.execute(
         state["task"],
         context={
+            "arxiv_draft": arxiv_text,
+            "wiki_draft": wiki_text,
             "draft_answer": state.get("draft_answer", ""),
+            "raw_results": state.get("search_results", ""),
             "gaps": state.get("missing_info", []),
         },
     )
@@ -109,7 +172,7 @@ def synthesizer_node(state: ResearchDeptState) -> Dict[str, Any]:
         {**state, "events": events},
         "agent_done",
         "SummarizerAgent",
-        "Research complete",
+        "Deep Research Report complete",
     )
 
     return {
@@ -122,11 +185,15 @@ def synthesizer_node(state: ResearchDeptState) -> Dict[str, Any]:
 
 research_graph = StateGraph(ResearchDeptState)
 
+research_graph.add_node("arxiv_node", arxiv_node)
+research_graph.add_node("wikipedia_node", wikipedia_node)
 research_graph.add_node("web_search_node", web_search_node)
 research_graph.add_node("fact_checker_node", fact_checker_node)
 research_graph.add_node("synthesizer_node", synthesizer_node)
 
-research_graph.add_edge(START, "web_search_node")
+research_graph.add_edge(START, "arxiv_node")
+research_graph.add_edge("arxiv_node", "wikipedia_node")
+research_graph.add_edge("wikipedia_node", "web_search_node")
 research_graph.add_edge("web_search_node", "fact_checker_node")
 research_graph.add_edge("fact_checker_node", "synthesizer_node")
 research_graph.add_edge("synthesizer_node", END)

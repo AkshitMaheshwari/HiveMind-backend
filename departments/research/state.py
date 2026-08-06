@@ -11,14 +11,17 @@ class ResearchDeptState(TypedDict):
     original_request: str          # Full original user request
 
     # ── Internal pipeline ──────────────────────────────────────────
-    search_results: str            # Raw search output
-    evidence: List[Dict[str, str]] # Structured evidence list
-    draft_answer: str              # Initial synthesis
-    fact_check_verdict: str        # "verified" | "needs_more"
-    missing_info: List[str]        # Gaps identified by fact-checker
+    search_results: str                # Raw web search output
+    arxiv_evidence: List[Dict[str, Any]]  # Scientific paper findings from arXiv
+    wikipedia_evidence: List[Dict[str, Any]] # Domain overview & background from Wikipedia
+    web_evidence: List[Dict[str, Any]] # General web & industry search findings
+    evidence: List[Dict[str, Any]]     # Aggregated evidence list across all sources
+    draft_answer: str                  # Initial synthesis
+    fact_check_verdict: str            # "verified" | "needs_more"
+    missing_info: List[str]            # Gaps identified by fact-checker
 
     # ── Output ─────────────────────────────────────────────────────
-    final_research: str            # Final polished research output
+    final_research: str                # Final polished research output
 
     # ── Events ─────────────────────────────────────────────────────
-    events: List[Dict[str, Any]]   # Events to bubble up to orchestrator
+    events: List[Dict[str, Any]]       # Events to bubble up to orchestrator
