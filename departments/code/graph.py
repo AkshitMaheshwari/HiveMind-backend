@@ -12,19 +12,15 @@ from departments.code.agents import CodeGeneratorAgent, DebuggerAgent, DocWriter
 from shared.tools import execute_code
 
 
-# ─── Lazy agent instantiation ─────────────────────────────────────────────────
-_code_gen = None
-_debugger = None
-_doc_writer = None
+# ─── Agent factory ───────────────────────────────────────────────────────────
 
-
-def _get_agents():
-    global _code_gen, _debugger, _doc_writer
-    if _code_gen is None:
-        _code_gen = CodeGeneratorAgent()
-        _debugger = DebuggerAgent()
-        _doc_writer = DocWriterAgent()
-    return _code_gen, _debugger, _doc_writer
+def _make_agents(api_keys=None, selected_model=None):
+    """Create fresh agent instances with the given API keys and model."""
+    return (
+        CodeGeneratorAgent(api_keys=api_keys, selected_model=selected_model),
+        DebuggerAgent(api_keys=api_keys, selected_model=selected_model),
+        DocWriterAgent(api_keys=api_keys, selected_model=selected_model),
+    )
 
 
 def _emit(state: CodeDeptState, event: str, agent: str, data: str = "") -> list:
@@ -43,7 +39,7 @@ def _emit(state: CodeDeptState, event: str, agent: str, data: str = "") -> list:
 
 def code_generator_node(state: CodeDeptState) -> Dict[str, Any]:
     """Code Generator — writes the initial code solution."""
-    code_gen, _, _ = _get_agents()
+    code_gen, _, _ = _make_agents(state.get("api_keys"), state.get("selected_model"))
 
     events = _emit(state, "agent_working", "CodeGeneratorAgent", "Generating code solution...")
 
@@ -67,7 +63,7 @@ def code_generator_node(state: CodeDeptState) -> Dict[str, Any]:
 
 def debugger_node(state: CodeDeptState) -> Dict[str, Any]:
     """Debugger — runs code in sandbox (Python) or verifies web code (HTML/JS/CSS)."""
-    _, debugger, _ = _get_agents()
+    _, debugger, _ = _make_agents(state.get("api_keys"), state.get("selected_model"))
 
     events = _emit(state, "agent_working", "DebuggerAgent", "Testing code in sandbox...")
 
@@ -129,7 +125,7 @@ def debugger_node(state: CodeDeptState) -> Dict[str, Any]:
 
 def doc_writer_node(state: CodeDeptState) -> Dict[str, Any]:
     """Doc Writer — generates documentation or formatted web deliverable."""
-    _, _, doc_writer = _get_agents()
+    _, _, doc_writer = _make_agents(state.get("api_keys"), state.get("selected_model"))
 
     lang = (state.get("_language") or "python").lower()
     final_code_display = state.get("fixed_code") or state.get("generated_code", "")
@@ -237,6 +233,8 @@ def code_department_node(state) -> Dict[str, Any]:
     initial_state = {
         "task": code_task,
         "original_request": state["user_request"],
+        "api_keys": state.get("api_keys"),
+        "selected_model": state.get("selected_model"),
         "events": [],
     }
 

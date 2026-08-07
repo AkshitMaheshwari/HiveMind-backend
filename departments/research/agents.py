@@ -191,24 +191,20 @@ class WebSearchAgent(ProductionAgent):
 class SummarizerAgent(ProductionAgent):
     name = "SummarizerAgent"
     department = "research"
-    system_prompt = """You are a Senior Principal Research Scientist & Synthesizer. You receive:
-    1. A primary research question
-    2. Academic scientific paper preprints (arXiv)
-    3. Foundational domain concepts (Wikipedia)
-    4. General web intelligence & industry results
-    5. Fact-checker notes and identified gaps
-    
-    Your job is to synthesize all of this into a comprehensive, publication-grade **Deep Academic Research Report**.
-    
-    Format your output in clean Markdown:
-    - **Title & Executive Summary**: Concise high-level synthesis of findings.
-    - **Foundational Concepts & Background**: Definitions and domain context (citing Wikipedia).
-    - **Academic Literature & Preprints Analysis**: Detailed breakdown of arXiv papers, methodologies, and key empirical results (with PDF links).
-    - **Industry Applications & Current State**: Insights from web search & practical applications.
-    - **Methodology & Critical Analysis**: Strengths, trade-offs, and limitations.
-    - **References & Citations**: Complete list of papers, links, and sources cited.
-    
-    Be rigorous, thorough, and professional."""
+    system_prompt = """You are a brilliant research assistant who explains complex topics clearly and helpfully.
+
+You receive findings from multiple research sources (arXiv papers, Wikipedia, web search) and synthesize them into a clear, direct answer.
+
+How to respond:
+- Answer the question directly and conversationally — like a knowledgeable friend, not a formal report.
+- Use Markdown naturally: ## headings for major sections, **bold** for key terms, bullet points for lists.
+- DO NOT use "Executive Summary", "Title & Executive Summary", "Foundational Concepts & Background", or similar corporate report headings.
+- DO NOT start with "# 📋 Output" or any emoji-header.
+- Lead with the answer/key insight. Then explain the supporting evidence.
+- For research papers: mention the paper name, authors, key finding, and link — naturally in the text.
+- For web sources: cite inline with [source name](url) links.
+- Keep it focused. Skip fluff. Match depth to the question complexity.
+- End with a "**Sources**" or "**Further Reading**" section if there are relevant links."""
 
     def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
         context = context or {}
@@ -221,26 +217,26 @@ class SummarizerAgent(ProductionAgent):
         prompt = f"""Research question: {task}
 
 --- ACADEMIC PAPERS & PREPRINTS (arXiv) ---
-{arxiv_draft if arxiv_draft else 'No arXiv data'}
+{arxiv_draft if arxiv_draft else 'No arXiv data available'}
 
 --- DOMAIN BACKGROUND (Wikipedia) ---
-{wiki_draft if wiki_draft else 'No Wikipedia data'}
+{wiki_draft if wiki_draft else 'No Wikipedia data available'}
 
---- WEB & INDUSTRY FINDINGS ---
-{web_draft if web_draft else 'No Web search data'}
+--- WEB FINDINGS ---
+{web_draft if web_draft else 'No web search data available'}
 
---- RAW SEARCH CONTEXT ---
+--- ADDITIONAL CONTEXT ---
 {raw_results[:3000] if raw_results else ''}
 
---- KNOWLEDGE GAPS & FACT CHECKER NOTES ---
+--- KNOWLEDGE GAPS & NOTES ---
 {chr(10).join(f'- {g}' for g in gaps) if gaps else 'None identified'}
 
-Please synthesize a comprehensive, publication-grade Deep Academic Research Report."""
+Please answer the research question clearly and helpfully using the above sources."""
 
         try:
             final_report = self._invoke(prompt)
             if not final_report or not str(final_report).strip():
-                final_report = f"# Research Report: {task}\n\n" + (web_draft or arxiv_draft or wiki_draft or raw_results)
+                final_report = (web_draft or arxiv_draft or wiki_draft or raw_results or f"I couldn't find enough information on: {task}")
             return AgentOutput(
                 agent_name=self.name,
                 department=self.department,
@@ -248,7 +244,7 @@ Please synthesize a comprehensive, publication-grade Deep Academic Research Repo
                 content=final_report,
             )
         except Exception as e:
-            fallback_report = f"# Research Report: {task}\n\n" + (web_draft or arxiv_draft or wiki_draft or raw_results or f"Research processing error: {e}")
+            fallback_report = (web_draft or arxiv_draft or wiki_draft or raw_results or f"Research error: {e}")
             return AgentOutput(
                 agent_name=self.name,
                 department=self.department,

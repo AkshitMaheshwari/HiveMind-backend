@@ -27,6 +27,7 @@ class ChatRequest(BaseModel):
     message: str
     conversation_id: str = "default"
     api_keys: Optional[ApiKeys] = None
+    selected_model: Optional[str] = None  # e.g. "gemini-2.0-flash", "llama-3.3-70b-versatile"
 
 
 class ChatResponse(BaseModel):
@@ -35,7 +36,13 @@ class ChatResponse(BaseModel):
     message: str
 
 
-async def run_task_async(task_id: str, user_request: str, conversation_id: str, api_keys: Optional[Dict[str, str]] = None):
+async def run_task_async(
+    task_id: str,
+    user_request: str,
+    conversation_id: str,
+    api_keys: Optional[Dict[str, str]] = None,
+    selected_model: Optional[str] = None,
+):
     """
     Runs the orchestrator in a background thread, updates DB, and streams events via WebSocket.
     """
@@ -57,6 +64,7 @@ async def run_task_async(task_id: str, user_request: str, conversation_id: str, 
                 "user_request": user_request,
                 "conversation_id": conversation_id,
                 "api_keys": api_keys,
+                "selected_model": selected_model,
                 "task_plan": None,
                 "active_departments": [],
                 "completed_departments": [],
@@ -86,6 +94,20 @@ async def run_task_async(task_id: str, user_request: str, conversation_id: str, 
 
         final_output = final_state.get("final_output", "Task completed.")
 
+        # Stream the final output token-by-token for a typewriter effect
+        words = final_output.split(" ")
+        chunk_size = 4  # send N words at a time
+        accumulated = ""
+        for i in range(0, len(words), chunk_size):
+            chunk = " ".join(words[i:i + chunk_size])
+            accumulated += ("" if i == 0 else " ") + chunk
+            await manager.broadcast(task_id, {
+                "event": "partial_output",
+                "data": accumulated,
+                "timestamp": datetime.utcnow().isoformat(),
+            })
+            await asyncio.sleep(0.02)  # ~50 chunks/second
+
         # Update DB task record
         await db_service.update_task(task_id, {
             "status": "done",
@@ -109,6 +131,13 @@ async def run_task_async(task_id: str, user_request: str, conversation_id: str, 
             "data": error_msg,
             "timestamp": datetime.utcnow().isoformat(),
         })
+
+
+@router.get("/models")
+async def get_models():
+    """Return the full model registry for all supported providers."""
+    from shared.llm import MODEL_REGISTRY
+    return MODEL_REGISTRY
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -136,6 +165,7 @@ async def start_chat(
         request.message,
         request.conversation_id,
         api_keys_dict,
+        request.selected_model,
     )
 
     return ChatResponse(
@@ -184,3 +214,17 @@ async def list_admin_tasks(admin_user: Dict[str, Any] = Depends(require_admin_us
     return tasks
 
 
+@router.delete("/task/{task_id}")
+async def delete_task(
+    task_id: str,
+    user: Dict[str, Any] = Depends(require_authenticated_user),
+):
+    """
+    Hard-delete a task and all its events from the database.
+    Only the task owner can delete their own task.
+    """
+    user_id = user.get("id") if user else None
+    success = await db_service.delete_task(task_id, user_id=user_id)
+    if success:
+        return {"success": True, "message": f"Task {task_id} deleted successfully."}
+    return {"success": False, "message": "Task not found or you do not have permission to delete it."}

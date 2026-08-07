@@ -98,7 +98,7 @@ def ceo_router_node(state: OrchestratorState) -> Dict[str, Any]:
     """
     from shared.llm import ceo_llm
 
-    llm = ceo_llm(state.get("api_keys"))
+    llm = ceo_llm(state.get("api_keys"), selected_model=state.get("selected_model"))
     structured_llm = llm.with_structured_output(TaskPlanOutput)
 
     events = emit_event(state, "ceo_planning", "CEO is analyzing your request...")

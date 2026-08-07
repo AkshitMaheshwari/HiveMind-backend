@@ -9,6 +9,8 @@ class ResearchDeptState(TypedDict):
     # ── Input ──────────────────────────────────────────────────────
     task: str                      # The research task from CEO
     original_request: str          # Full original user request
+    api_keys: Optional[Dict[str, str]]   # User-provided API keys
+    selected_model: Optional[str]        # User's chosen model id
 
     # ── Internal pipeline ──────────────────────────────────────────
     search_results: str                # Raw web search output

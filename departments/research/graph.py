@@ -17,23 +17,17 @@ from departments.research.agents import (
 )
 
 
-# ─── Instantiate agents ───────────────────────────────────────────────────────
-_arxiv_agent = None
-_wikipedia_agent = None
-_web_search_agent = None
-_summarizer_agent = None
-_fact_checker_agent = None
+# ─── Agent factory ───────────────────────────────────────────────────────────
 
-
-def _get_agents():
-    global _arxiv_agent, _wikipedia_agent, _web_search_agent, _summarizer_agent, _fact_checker_agent
-    if _arxiv_agent is None:
-        _arxiv_agent = ArxivResearchAgent()
-        _wikipedia_agent = WikipediaAgent()
-        _web_search_agent = WebSearchAgent()
-        _summarizer_agent = SummarizerAgent()
-        _fact_checker_agent = FactCheckerAgent()
-    return _arxiv_agent, _wikipedia_agent, _web_search_agent, _summarizer_agent, _fact_checker_agent
+def _make_agents(api_keys=None, selected_model=None):
+    """Create fresh agent instances with the given API keys and model."""
+    return (
+        ArxivResearchAgent(api_keys=api_keys, selected_model=selected_model),
+        WikipediaAgent(api_keys=api_keys, selected_model=selected_model),
+        WebSearchAgent(api_keys=api_keys, selected_model=selected_model),
+        SummarizerAgent(api_keys=api_keys, selected_model=selected_model),
+        FactCheckerAgent(api_keys=api_keys, selected_model=selected_model),
+    )
 
 
 def _emit(state: ResearchDeptState, event: str, agent: str, data: str = "") -> list:
@@ -52,7 +46,7 @@ def _emit(state: ResearchDeptState, event: str, agent: str, data: str = "") -> l
 
 def arxiv_node(state: ResearchDeptState) -> Dict[str, Any]:
     """Arxiv Research Agent — searches arXiv for scientific preprints and papers."""
-    arxiv_agent, _, _, _, _ = _get_agents()
+    arxiv_agent, _, _, _, _ = _make_agents(state.get("api_keys"), state.get("selected_model"))
 
     events = _emit(state, "agent_working", "ArxivResearchAgent", "Searching arXiv scientific papers...")
     output = arxiv_agent.execute(state["task"])
@@ -72,7 +66,7 @@ def arxiv_node(state: ResearchDeptState) -> Dict[str, Any]:
 
 def wikipedia_node(state: ResearchDeptState) -> Dict[str, Any]:
     """Wikipedia Agent — searches Wikipedia for background domain context."""
-    _, wikipedia_agent, _, _, _ = _get_agents()
+    _, wikipedia_agent, _, _, _ = _make_agents(state.get("api_keys"), state.get("selected_model"))
 
     events = _emit(state, "agent_working", "WikipediaAgent", "Searching Wikipedia knowledge base...")
     output = wikipedia_agent.execute(state["task"])
@@ -92,7 +86,7 @@ def wikipedia_node(state: ResearchDeptState) -> Dict[str, Any]:
 
 def web_search_node(state: ResearchDeptState) -> Dict[str, Any]:
     """Web Search Agent — finds real-time web intelligence and documentation."""
-    _, _, web_search_agent, _, _ = _get_agents()
+    _, _, web_search_agent, _, _ = _make_agents(state.get("api_keys"), state.get("selected_model"))
 
     events = _emit(state, "agent_working", "WebSearchAgent", "Searching web and technical docs...")
     output = web_search_agent.execute(state["task"])
@@ -121,7 +115,7 @@ def web_search_node(state: ResearchDeptState) -> Dict[str, Any]:
 
 def fact_checker_node(state: ResearchDeptState) -> Dict[str, Any]:
     """Fact Checker Agent — verifies draft and checks academic & web evidence."""
-    _, _, _, _, fact_checker_agent = _get_agents()
+    _, _, _, _, fact_checker_agent = _make_agents(state.get("api_keys"), state.get("selected_model"))
 
     events = _emit(state, "agent_working", "FactCheckerAgent", "Cross-verifying evidence & claims...")
 
@@ -148,8 +142,8 @@ def fact_checker_node(state: ResearchDeptState) -> Dict[str, Any]:
 
 
 def synthesizer_node(state: ResearchDeptState) -> Dict[str, Any]:
-    """Summarizer Agent — synthesizes arXiv, Wikipedia, and Web evidence into a Deep Research Report."""
-    _, _, _, summarizer_agent, _ = _get_agents()
+    """Summarizer Agent — synthesizes arXiv, Wikipedia, and Web evidence into a clear answer."""
+    _, _, _, summarizer_agent, _ = _make_agents(state.get("api_keys"), state.get("selected_model"))
 
     events = _emit(state, "agent_working", "SummarizerAgent", "Synthesizing Deep Research Report...")
 
@@ -233,6 +227,8 @@ def research_department_node(state: "OrchestratorState") -> Dict[str, Any]:
     initial_state = {
         "task": research_task,
         "original_request": state["user_request"],
+        "api_keys": state.get("api_keys"),
+        "selected_model": state.get("selected_model"),
         "events": [],
     }
 

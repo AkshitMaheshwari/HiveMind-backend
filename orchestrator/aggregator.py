@@ -9,15 +9,18 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from orchestrator.state import OrchestratorState
 
 
-AGGREGATOR_PROMPT = """You are the CEO of an AI company finalizing a client deliverable.
+AGGREGATOR_PROMPT = """You are a knowledgeable AI assistant synthesizing research from multiple specialized agents.
 
-You have received outputs from your departments. Your job is to:
-1. Synthesize all department outputs into ONE unified, polished final response
-2. Maintain proper structure with clear sections for each department's contribution
-3. Add an Executive Summary at the top
-4. Ensure the tone is professional and the output is directly useful to the user
+Your job is to combine their findings into a single, clear, helpful response — like a smart friend explaining something to you.
 
-Format in clean Markdown. Start with "# 📋 Final Report" then the Executive Summary.
+Guidelines:
+- Be direct and conversational. No corporate jargon or unnecessary formality.
+- Use Markdown for structure: headings, bullet points, bold for key terms, code blocks for code.
+- DO NOT start with "# 📋 Final Report" or "Executive Summary" headers — just answer the question naturally.
+- Lead with the most important insight. Then add supporting details.
+- If there are sources or links, include them inline or in a "Sources" section at the end.
+- Keep it scannable: use short paragraphs and bullets where appropriate.
+- Match the length to the complexity — simple questions get short answers, deep questions get detailed ones.
 """
 
 
@@ -44,8 +47,8 @@ def aggregator_node(state: OrchestratorState) -> Dict[str, Any]:
         dept, output = list(department_outputs.items())[0]
         output_str = str(output).strip() if output else ""
         if not output_str:
-            output_str = f"No specific report content was returned by the {dept} department."
-        final = output_str if output_str.startswith("#") else f"# 📋 Output\n\n{output_str}"
+            output_str = f"I wasn't able to find specific information from the {dept} department. Please try rephrasing your question."
+        final = output_str
         events.append({
             "event": "final_output",
             "data": final,
@@ -61,17 +64,17 @@ def aggregator_node(state: OrchestratorState) -> Dict[str, Any]:
         combined_context += f"## {dept.upper()} DEPARTMENT OUTPUT:\n{output}\n\n---\n\n"
 
     try:
-        llm = ceo_llm(state.get("api_keys"))
+        llm = ceo_llm(state.get("api_keys"), selected_model=state.get("selected_model"))
         response = llm.invoke([
             SystemMessage(content=AGGREGATOR_PROMPT),
             HumanMessage(content=combined_context),
         ])
         final = response.content
     except Exception as e:
-        # Fallback: just concatenate
-        final = f"# 📋 Final Report\n\n**User Request:** {state['user_request']}\n\n"
+        # Fallback: just concatenate departments cleanly
+        final = f"**Based on your question:** {state['user_request']}\n\n"
         for dept, output in department_outputs.items():
-            final += f"## {dept.upper()} Department\n\n{output}\n\n---\n\n"
+            final += f"### {dept.capitalize()} Findings\n\n{output}\n\n"
 
     events.append({
         "event": "final_output",

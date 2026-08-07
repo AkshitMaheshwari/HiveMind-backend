@@ -9,6 +9,8 @@ class CodeDeptState(TypedDict):
     # ── Input ──────────────────────────────────────────────────────
     task: str
     original_request: str
+    api_keys: Optional[Dict[str, str]]   # User-provided API keys
+    selected_model: Optional[str]        # User's chosen model id
 
     # ── Internal pipeline ──────────────────────────────────────────
     problem_description: str      # Parsed/clarified problem

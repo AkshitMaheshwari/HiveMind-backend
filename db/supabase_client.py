@@ -192,6 +192,47 @@ class SupabaseDatabaseService:
                 logger.error(f"Error fetching profile: {e}")
         return {"id": user_id, "role": "user", "email": "user@example.com"}
 
+    async def delete_task(self, task_id: str, user_id: Optional[str] = None) -> bool:
+        """
+        Hard-deletes a task and all its events from the database.
+        Enforces user ownership — only the task owner can delete it.
+        Returns True if deleted, False if not found / not authorized.
+        """
+        if self.client:
+            try:
+                # Verify ownership before deleting
+                query = self.client.table("tasks").select("id").eq("id", task_id)
+                if user_id:
+                    query = query.eq("user_id", user_id)
+                check = query.execute()
+                if not check.data:
+                    logger.warning(f"delete_task: task {task_id} not found or not owned by user {user_id}")
+                    return False
+
+                # Delete associated events first (cascade may handle this, but be explicit)
+                try:
+                    self.client.table("task_events").delete().eq("task_id", task_id).execute()
+                except Exception as e:
+                    logger.warning(f"Error deleting events for task {task_id}: {e}")
+
+                # Delete the task itself
+                resp = self.client.table("tasks").delete().eq("id", task_id).execute()
+                logger.info(f"Task {task_id} deleted from Supabase by user {user_id}")
+                return True
+            except Exception as e:
+                logger.error(f"Error deleting task {task_id} from Supabase: {e}")
+                return False
+
+        # Fallback in-memory
+        if task_id in self._in_memory_tasks:
+            task = self._in_memory_tasks[task_id]
+            if user_id and task.get("user_id") and task["user_id"] != user_id:
+                return False
+            del self._in_memory_tasks[task_id]
+            self._in_memory_events.pop(task_id, None)
+            return True
+        return False
+
     async def list_admin_all_tasks(self, limit: int = 100) -> List[Dict[str, Any]]:
         """Lists all system tasks across all users (Admin view)."""
         if self.client:

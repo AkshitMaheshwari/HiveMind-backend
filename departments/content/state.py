@@ -10,6 +10,8 @@ class ContentDeptState(TypedDict):
     task: str                          # Content task from CEO
     original_request: str
     research_context: str              # Research output (if available)
+    api_keys: Optional[Dict[str, str]]   # User-provided API keys
+    selected_model: Optional[str]        # User's chosen model id
 
     # ── Internal pipeline ──────────────────────────────────────────
     draft_content: str                 # Copywriter's draft

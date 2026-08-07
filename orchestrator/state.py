@@ -32,6 +32,7 @@ class OrchestratorState(TypedDict):
     user_request: str
     conversation_id: str
     api_keys: Optional[Dict[str, str]]
+    selected_model: Optional[str]  # e.g. "gemini-2.0-flash", "llama-3.3-70b-versatile"
 
     # ── CEO Routing ────────────────────────────────────────────────
     task_plan: Optional[Dict[str, Any]]       # CEO's JSON task plan

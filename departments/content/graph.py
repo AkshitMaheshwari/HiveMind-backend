@@ -11,19 +11,15 @@ from departments.content.state import ContentDeptState
 from departments.content.agents import CopywriterAgent, SEOOptimizerAgent, EditorAgent
 
 
-# ─── Lazy agent instantiation ─────────────────────────────────────────────────
-_copywriter = None
-_seo_optimizer = None
-_editor = None
+# ─── Agent factory ───────────────────────────────────────────────────────────
 
-
-def _get_agents():
-    global _copywriter, _seo_optimizer, _editor
-    if _copywriter is None:
-        _copywriter = CopywriterAgent()
-        _seo_optimizer = SEOOptimizerAgent()
-        _editor = EditorAgent()
-    return _copywriter, _seo_optimizer, _editor
+def _make_agents(api_keys=None, selected_model=None):
+    """Create fresh agent instances with the given API keys and model."""
+    return (
+        CopywriterAgent(api_keys=api_keys, selected_model=selected_model),
+        SEOOptimizerAgent(api_keys=api_keys, selected_model=selected_model),
+        EditorAgent(api_keys=api_keys, selected_model=selected_model),
+    )
 
 
 def _emit(state: ContentDeptState, event: str, agent: str, data: str = "") -> list:
@@ -42,7 +38,7 @@ def _emit(state: ContentDeptState, event: str, agent: str, data: str = "") -> li
 
 def copywriter_node(state: ContentDeptState) -> Dict[str, Any]:
     """Copywriter Agent — creates the initial content draft."""
-    copywriter, _, _ = _get_agents()
+    copywriter, _, _ = _make_agents(state.get("api_keys"), state.get("selected_model"))
 
     events = _emit(state, "agent_working", "CopywriterAgent", "Writing content draft...")
 
@@ -162,6 +158,8 @@ def content_department_node(state) -> Dict[str, Any]:
         "task": content_task,
         "original_request": state["user_request"],
         "research_context": research_context,
+        "api_keys": state.get("api_keys"),
+        "selected_model": state.get("selected_model"),
         "events": [],
     }
 
