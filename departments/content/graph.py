@@ -62,7 +62,7 @@ def copywriter_node(state: ContentDeptState) -> Dict[str, Any]:
 
 def seo_optimizer_node(state: ContentDeptState) -> Dict[str, Any]:
     """SEO Optimizer Agent — keyword optimization."""
-    _, seo_optimizer, _ = _get_agents()
+    _, seo_optimizer, _ = _make_agents(state.get("api_keys"), state.get("selected_model"))
 
     events = _emit(state, "agent_working", "SEOOptimizerAgent", "Optimizing for search engines...")
 
@@ -88,7 +88,7 @@ def seo_optimizer_node(state: ContentDeptState) -> Dict[str, Any]:
 
 def editor_node(state: ContentDeptState) -> Dict[str, Any]:
     """Editor Agent — final polish and proofreading."""
-    _, _, editor = _get_agents()
+    _, _, editor = _make_agents(state.get("api_keys"), state.get("selected_model"))
 
     events = _emit(state, "agent_working", "EditorAgent", "Editing and proofreading...")
 

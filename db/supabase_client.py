@@ -74,14 +74,19 @@ class SupabaseDatabaseService:
 
         if self.client:
             try:
-                response = self.client.table("tasks").update(updates).eq("id", task_id).execute()
+                # Add .neq("status", "deleted") so background tasks don't resurrect deleted tasks
+                response = self.client.table("tasks").update(updates).eq("id", task_id).neq("status", "deleted").execute()
                 if response.data:
                     return response.data[0]
+                else:
+                    return None
             except Exception as e:
                 logger.error(f"Error updating task in Supabase: {e}")
 
         # Fallback in-memory
         if task_id in self._in_memory_tasks:
+            if self._in_memory_tasks[task_id].get("status") == "deleted":
+                return None # Do not resurrect soft-deleted task
             self._in_memory_tasks[task_id].update(updates)
             return self._in_memory_tasks[task_id]
         return None
@@ -161,6 +166,7 @@ class SupabaseDatabaseService:
         if self.client:
             try:
                 query = self.client.table("tasks").select("*").order("created_at", desc=True).limit(limit)
+                query = query.neq("status", "deleted")  # Exclude soft-deleted tasks
                 if conversation_id:
                     query = query.eq("conversation_id", conversation_id)
                 if user_id:
@@ -178,6 +184,10 @@ class SupabaseDatabaseService:
             tasks = [t for t in tasks if t.get("conversation_id") == conversation_id]
         if user_id:
             tasks = [t for t in tasks if t.get("user_id") == user_id]
+        
+        # Exclude soft-deleted tasks
+        tasks = [t for t in tasks if t.get("status") != "deleted"]
+            
         tasks.sort(key=lambda x: x.get("created_at", ""), reverse=True)
         return tasks[:limit]
 
@@ -194,9 +204,8 @@ class SupabaseDatabaseService:
 
     async def delete_task(self, task_id: str, user_id: Optional[str] = None) -> bool:
         """
-        Hard-deletes a task and all its events from the database.
-        Enforces user ownership — only the task owner can delete it.
-        Returns True if deleted, False if not found / not authorized.
+        Deletes a task and its events from the database.
+        If the database RLS policies block hard-deletes, it performs a soft-delete (status='deleted').
         """
         if self.client:
             try:
@@ -209,15 +218,23 @@ class SupabaseDatabaseService:
                     logger.warning(f"delete_task: task {task_id} not found or not owned by user {user_id}")
                     return False
 
-                # Delete associated events first (cascade may handle this, but be explicit)
+                # Delete associated events first
                 try:
                     self.client.table("task_events").delete().eq("task_id", task_id).execute()
                 except Exception as e:
                     logger.warning(f"Error deleting events for task {task_id}: {e}")
 
-                # Delete the task itself
+                # Try hard-delete the task
                 resp = self.client.table("tasks").delete().eq("id", task_id).execute()
-                logger.info(f"Task {task_id} deleted from Supabase by user {user_id}")
+                
+                # If RLS blocks the DELETE (common when DELETE policy is missing), fallback to Soft Delete
+                if len(resp.data) == 0:
+                    logger.info(f"Hard delete blocked by RLS for task {task_id}. Falling back to soft-delete.")
+                    update_resp = self.client.table("tasks").update({"status": "deleted"}).eq("id", task_id).execute()
+                    if len(update_resp.data) == 0:
+                        return False
+                        
+                logger.info(f"Task {task_id} deleted successfully.")
                 return True
             except Exception as e:
                 logger.error(f"Error deleting task {task_id} from Supabase: {e}")
