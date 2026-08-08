@@ -178,9 +178,14 @@ def doc_writer_node(state: CodeDeptState) -> Dict[str, Any]:
 ```
 
 ### Execution Results
-- **Status:** {"✅ Passed" if exec_success else "⚠️ Errors encountered (see debugger output)"}
-- **Output:** `{state.get("execution_stdout", "No output")[:300]}`
-{f'- **Errors:** `{state.get("execution_stderr", "")[:300]}`' if state.get("execution_stderr") else ""}
+- **Status:** {"✅ Passed" if exec_success else "⚠️ Errors encountered"}
+
+**Output:**
+```text
+{state.get("execution_stdout", "No output")[:500]}
+```
+
+{f'**Errors:**\\n```text\\n{state.get("execution_stderr", "")[:500]}\\n```' if state.get("execution_stderr") else ""}
 
 ### Documentation
 
