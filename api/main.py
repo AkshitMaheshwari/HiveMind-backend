@@ -2,6 +2,7 @@
 FastAPI application entry point.
 Serves the REST API, WebSocket endpoint, and static frontend.
 """
+import logging
 import sys
 from pathlib import Path
 
@@ -10,6 +11,8 @@ _BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(_BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(_BACKEND_ROOT))
 
+logger = logging.getLogger(__name__)
+
 from typing import Optional
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,6 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from api.routes.chat import router as chat_router
+from api.routes.upload import router as upload_router
 from api.websocket.stream import manager
 from api.auth import verify_token
 from db.supabase_client import db_service
@@ -30,6 +34,36 @@ app = FastAPI(
     version="1.0.0",
 )
 
+
+@app.on_event("startup")
+async def startup_event() -> None:
+    """
+    Application startup: bootstrap the tool registry and initialise the
+    Qdrant vector collection (idempotent — safe to run on every start).
+    """
+    try:
+        from shared.tools.registry_bootstrap import bootstrap
+        bootstrap()
+    except Exception as exc:
+        # Log loudly — a broken registry at startup is a hard failure.
+        logger.critical(
+            "Tool registry bootstrap FAILED — agents may not have access to tools: %s",
+            exc,
+            exc_info=True,
+        )
+        raise
+
+    try:
+        from rag.vector_store import QdrantVectorStore
+        store = QdrantVectorStore()
+        store.ensure_collection()
+        logger.info("Qdrant vector collection initialised successfully.")
+    except Exception as exc:
+        # Non-fatal: RAG won't work, but other agents still can.
+        logger.warning(
+            "Qdrant initialisation failed — RAG features will be unavailable: %s", exc
+        )
+
 # ─── CORS ─────────────────────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
@@ -41,6 +75,7 @@ app.add_middleware(
 
 # ─── API Routes ───────────────────────────────────────────────────────────────
 app.include_router(chat_router, prefix="/api", tags=["Chat"])
+app.include_router(upload_router, prefix="/api", tags=["Upload"])
 
 
 # ─── WebSocket ────────────────────────────────────────────────────────────────
