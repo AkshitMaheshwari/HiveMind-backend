@@ -1,33 +1,25 @@
 """
-RAG embedder — provides LangChain OpenAIEmbeddings.
+RAG embedder — provides LangChain HuggingFaceEndpointEmbeddings.
 """
 import os
 import logging
-from langchain_openai import OpenAIEmbeddings
+from langchain_huggingface import HuggingFaceEndpointEmbeddings
 
 logger = logging.getLogger(__name__)
 
-def get_embedder() -> OpenAIEmbeddings:
+def get_embedder() -> HuggingFaceEndpointEmbeddings:
     """
-    Returns a configured LangChain OpenAIEmbeddings instance.
-    Uses OPENAI_API_KEY and optionally OPENAI_BASE_URL.
+    Returns a configured LangChain HuggingFaceEndpointEmbeddings instance.
+    Uses HF_TOKEN and EMBEDDING_MODEL.
     """
-    from rag.config import EMBEDDING_MODEL, EMBEDDING_DIMENSIONS, MAX_EMBED_RETRIES
+    from rag.config import EMBEDDING_MODEL
     
-    api_key = os.getenv("OPENAI_API_KEY", "")
-    base_url = os.getenv("OPENAI_BASE_URL", "")
+    hf_token = os.getenv("HF_TOKEN", "")
     
-    if not api_key:
-        logger.warning("Embedder: OPENAI_API_KEY is not set.")
+    if not hf_token:
+        logger.warning("Embedder: HF_TOKEN is not set.")
         
-    kwargs = {
-        "model": EMBEDDING_MODEL,
-        "openai_api_key": api_key,
-        "max_retries": MAX_EMBED_RETRIES,
-        "dimensions": EMBEDDING_DIMENSIONS,
-    }
-    
-    if base_url:
-        kwargs["openai_api_base"] = base_url
-        
-    return OpenAIEmbeddings(**kwargs)
+    return HuggingFaceEndpointEmbeddings(
+        model=EMBEDDING_MODEL,
+        huggingfacehub_api_token=hf_token,
+    )

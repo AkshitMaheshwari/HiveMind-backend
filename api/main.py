@@ -54,9 +54,8 @@ async def startup_event() -> None:
         raise
 
     try:
-        from rag.vector_store import QdrantVectorStore
-        store = QdrantVectorStore()
-        store.ensure_collection()
+        from rag.vector_store import ensure_collection
+        ensure_collection()
         logger.info("Qdrant vector collection initialised successfully.")
     except Exception as exc:
         # Non-fatal: RAG won't work, but other agents still can.

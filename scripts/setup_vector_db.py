@@ -61,9 +61,8 @@ def main() -> int:
     logger.info("=" * 60)
 
     try:
-        from rag.vector_store import QdrantVectorStore
-        store = QdrantVectorStore()
-        store.ensure_collection()
+        from rag.vector_store import ensure_collection
+        ensure_collection()
         logger.info("✅  Collection '%s' is ready.", QDRANT_COLLECTION)
         return 0
     except ImportError as exc:
