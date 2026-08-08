@@ -134,26 +134,34 @@ class QdrantVectorStore:
 
         try:
             existing = [c.name for c in self._client.get_collections().collections]
-            if self._collection in existing:
+            if self._collection not in existing:
+                self._client.create_collection(
+                    collection_name=self._collection,
+                    vectors_config=VectorParams(
+                        size=self._dimensions,
+                        distance=Distance.COSINE,
+                    ),
+                )
+                logger.info(
+                    "QdrantVectorStore.ensure_collection: created collection '%s' "
+                    "(dimensions=%d, distance=COSINE).",
+                    self._collection,
+                    self._dimensions,
+                )
+            else:
                 logger.info(
                     "QdrantVectorStore.ensure_collection: collection '%s' already exists.",
                     self._collection,
                 )
-                return
 
-            self._client.create_collection(
+            # Ensure the user_id payload index exists for filtering (idempotent)
+            from qdrant_client.models import PayloadSchemaType # type: ignore[import]
+            self._client.create_payload_index(
                 collection_name=self._collection,
-                vectors_config=VectorParams(
-                    size=self._dimensions,
-                    distance=Distance.COSINE,
-                ),
+                field_name="user_id",
+                field_schema=PayloadSchemaType.KEYWORD,
             )
-            logger.info(
-                "QdrantVectorStore.ensure_collection: created collection '%s' "
-                "(dimensions=%d, distance=COSINE).",
-                self._collection,
-                self._dimensions,
-            )
+            logger.info("QdrantVectorStore.ensure_collection: verified user_id index.")
         except Exception as exc:
             logger.error(
                 "QdrantVectorStore.ensure_collection failed: collection=%s error=%s",

@@ -53,6 +53,7 @@ class Embedder:
         dimensions: int = 0,
         max_retries: int = 0,
         api_key: str = "",
+        base_url: str = "",
     ) -> None:
         from rag.config import EMBEDDING_MODEL, EMBEDDING_DIMENSIONS, MAX_EMBED_RETRIES
 
@@ -60,6 +61,7 @@ class Embedder:
         self._dimensions = dimensions or EMBEDDING_DIMENSIONS
         self._max_retries = max_retries or MAX_EMBED_RETRIES
         self._api_key = api_key or os.getenv("OPENAI_API_KEY", "")
+        self._base_url = base_url or os.getenv("OPENAI_BASE_URL", "")
 
         if not self._api_key:
             logger.warning(
@@ -163,7 +165,11 @@ class Embedder:
             before_sleep=before_sleep_log(logger, logging.WARNING),
         )
         def _call() -> List[List[float]]:
-            client = openai.OpenAI(api_key=self._api_key)
+            client_kwargs = {"api_key": self._api_key}
+            if self._base_url:
+                client_kwargs["base_url"] = self._base_url
+                
+            client = openai.OpenAI(**client_kwargs)
             response = client.embeddings.create(
                 input=texts,
                 model=self._model,
