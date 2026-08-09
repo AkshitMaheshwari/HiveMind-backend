@@ -25,6 +25,7 @@ from orchestrator.aggregator import aggregator_node
 from departments.research.graph import research_department_node
 from departments.content.graph import content_department_node
 from departments.code.graph import code_department_node
+from departments.document.graph import document_department_node
 
 
 # ─── Routing function: CEO → Departments ─────────────────────────────────────
@@ -100,6 +101,7 @@ def build_orchestrator_graph() -> StateGraph:
     graph.add_node("research_department_node", research_department_node)
     graph.add_node("content_department_node", content_department_node)
     graph.add_node("code_department_node", code_department_node)
+    graph.add_node("document_department_node", document_department_node)
     graph.add_node("aggregator_node", aggregator_node)
 
     # ── Edges ──────────────────────────────────────────────────────────────────
@@ -114,12 +116,13 @@ def build_orchestrator_graph() -> StateGraph:
             "research_department_node": "research_department_node",
             "content_department_node": "content_department_node",
             "code_department_node": "code_department_node",
+            "document_department_node": "document_department_node",
             "aggregator_node": "aggregator_node",
         },
     )
 
     # After each department → next department or aggregator
-    for dept in ["research", "content", "code"]:
+    for dept in ["research", "content", "code", "document"]:
         graph.add_conditional_edges(
             f"{dept}_department_node",
             route_after_department,
@@ -127,6 +130,7 @@ def build_orchestrator_graph() -> StateGraph:
                 "research_department_node": "research_department_node",
                 "content_department_node": "content_department_node",
                 "code_department_node": "code_department_node",
+                "document_department_node": "document_department_node",
                 "aggregator_node": "aggregator_node",
             },
         )

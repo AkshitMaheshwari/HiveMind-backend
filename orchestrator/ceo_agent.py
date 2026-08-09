@@ -20,7 +20,7 @@ from orchestrator.state import OrchestratorState
 # ─── Pydantic schema for structured CEO output ────────────────────────────────
 
 class SubTask(BaseModel):
-    department: Literal["research", "content", "code"]
+    department: Literal["research", "content", "code", "document"]
     task: str = Field(description="Specific task for this department")
     depends_on: Optional[str] = Field(
         None, description="Name of department this task depends on, or null"
@@ -28,7 +28,7 @@ class SubTask(BaseModel):
 
 
 class TaskPlanOutput(BaseModel):
-    departments: List[Literal["research", "content", "code"]] = Field(
+    departments: List[Literal["research", "content", "code", "document"]] = Field(
         default_factory=list,
         description="List of departments needed, in execution order. Empty list if clarification_needed is True."
     )
@@ -49,8 +49,12 @@ class TaskPlanOutput(BaseModel):
 CEO_SYSTEM_PROMPT = """You are the CEO of an AI company with three departments:
 
 🔬 RESEARCH DEPARTMENT
-- Web research, fact-finding, market analysis, summarization, querying user's uploaded documents (PDFs, knowledge base).
-- Use when: user wants information, analysis, or research on any topic, or asks questions about their uploaded files.
+- Web research, fact-finding, market analysis, summarization.
+- Use when: user wants information, analysis, or research on any topic on the web.
+
+📄 DOCUMENT DEPARTMENT
+- Direct Q&A, data extraction, and search within the user's uploaded documents (PDFs, knowledge base).
+- Use when: user asks questions about their uploaded files, PDFs, or private data.
 
 ✍️  CONTENT DEPARTMENT  
 - Writing, blog posts, SEO, copywriting, editing, social media content
@@ -77,7 +81,7 @@ Examples:
 - "Research competitors and write a comparison" → departments=["research", "content"], sequence="sequential"
 - "Fix this Python bug" → departments=["code"], sequence="parallel"
 - "hello" → clarification_needed=True, sequence="sequential", departments=[]
-- "what is in my uploaded PDF" → departments=["research"], sequence="sequential"
+- "what is in my uploaded PDF" → departments=["document"], sequence="sequential"
 """
 
 
