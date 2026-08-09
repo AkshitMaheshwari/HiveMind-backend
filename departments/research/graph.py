@@ -98,11 +98,9 @@ def rag_search_node(state: ResearchDeptState) -> Dict[str, Any]:
 
     confidence = output.metadata.get("confidence", 0.0)
     
-    # Check if fallback is needed (e.g. confidence below 15%)
-    # Lowered threshold to 0.15 because instruction-heavy queries 
-    # (e.g. "Extract X...") inherently have lower cosine similarity 
-    # to factual document text.
-    fallback = confidence < 0.15
+    # Check if fallback is needed (e.g. confidence below 35%)
+    # Threshold set to 0.35 as requested.
+    fallback = confidence < 0.35
 
     events = _emit(
         {**state, "events": events},

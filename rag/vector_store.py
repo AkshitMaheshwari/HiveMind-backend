@@ -9,16 +9,20 @@ logger = logging.getLogger(__name__)
 
 def get_vector_store() -> QdrantVectorStore:
     """
-    Returns a configured LangChain QdrantVectorStore.
+    Returns a configured LangChain QdrantVectorStore with Hybrid Search.
     """
     from rag.config import QDRANT_URL, QDRANT_API_KEY, QDRANT_COLLECTION
     from rag.embedder import get_embedder
+    from langchain_qdrant import FastEmbedSparse, RetrievalMode
 
     embedder = get_embedder()
+    sparse_embedder = FastEmbedSparse(model_name="Qdrant/bm25")
 
     if QDRANT_URL:
         return QdrantVectorStore.from_existing_collection(
             embedding=embedder,
+            sparse_embedding=sparse_embedder,
+            retrieval_mode=RetrievalMode.HYBRID,
             collection_name=QDRANT_COLLECTION,
             url=QDRANT_URL,
             api_key=QDRANT_API_KEY or None,
@@ -30,6 +34,8 @@ def get_vector_store() -> QdrantVectorStore:
         )
         return QdrantVectorStore.from_existing_collection(
             embedding=embedder,
+            sparse_embedding=sparse_embedder,
+            retrieval_mode=RetrievalMode.HYBRID,
             collection_name=QDRANT_COLLECTION,
             location=":memory:",
         )
@@ -57,13 +63,17 @@ def ensure_collection() -> None:
 
         existing = [c.name for c in client.get_collections().collections]
         if QDRANT_COLLECTION not in existing:
+            from qdrant_client.models import SparseVectorParams
             client.create_collection(
                 collection_name=QDRANT_COLLECTION,
                 vectors_config=VectorParams(
                     size=EMBEDDING_DIMENSIONS, distance=Distance.COSINE
                 ),
+                sparse_vectors_config={
+                    "langchain-sparse": SparseVectorParams()
+                }
             )
-            logger.info("ensure_collection: created collection %s", QDRANT_COLLECTION)
+            logger.info("ensure_collection: created collection %s with hybrid search", QDRANT_COLLECTION)
 
         # In langchain_qdrant, metadata is usually stored under the 'metadata' payload key.
         client.create_payload_index(

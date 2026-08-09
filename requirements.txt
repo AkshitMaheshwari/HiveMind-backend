@@ -41,6 +41,7 @@ openai>=1.0.0
 tenacity>=8.0.0
 langchain-qdrant>=0.1.0
 langchain-text-splitters>=0.2.0
+fastembed>=0.2.0
 
 # Testing
 pytest>=7.0.0
