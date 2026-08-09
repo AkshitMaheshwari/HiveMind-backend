@@ -76,6 +76,7 @@ async def run_task_async(
             initial_state = {
                 "user_request": user_request,
                 "conversation_id": conversation_id,
+                "user_id": user_id,
                 "chat_history": chat_history,
                 "api_keys": api_keys,
                 "selected_model": selected_model,

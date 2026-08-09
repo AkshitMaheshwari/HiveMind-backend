@@ -31,6 +31,7 @@ class OrchestratorState(TypedDict):
     # ── Input ──────────────────────────────────────────────────────
     user_request: str
     conversation_id: str
+    user_id: str
     api_keys: Optional[Dict[str, str]]
     selected_model: Optional[str]  # e.g. "gemini-2.0-flash", "llama-3.3-70b-versatile"
 

@@ -31,6 +31,55 @@ class FactCheckResult(BaseModel):
     confidence: float = Field(description="Overall confidence score 0-1")
 
 
+class ResearchRoute(BaseModel):
+    sources: List[str] = Field(description="List of sources to search. Options: 'rag_search_node', 'arxiv_node', 'wikipedia_node', 'web_search_node'.")
+    reasoning: str = Field(description="Why these sources were selected.")
+
+
+# ─── ResearchRouterAgent ──────────────────────────────────────────────────────
+
+class ResearchRouterAgent(ProductionAgent):
+    name = "ResearchRouterAgent"
+    department = "research"
+    system_prompt = """You are the Research Director. Analyze the user's research query and decide which knowledge sources are required.
+    
+    Source Selection Guidelines:
+    - User explicitly mentions a PDF, uploaded document, private file -> Select 'rag_search_node' ONLY.
+    - Academic papers, physics, machine learning literature -> Select 'arxiv_node'.
+    - General background knowledge, historical facts -> Select 'wikipedia_node'.
+    - Current events, company info, technical documentation, general web -> Select 'web_search_node'.
+    
+    You may select multiple sources if the query is complex and crosses domains.
+    However, if the query strictly relates to an uploaded document, prefer 'rag_search_node' exclusively. Do NOT select 'web_search_node' "just in case" for document queries.
+    """
+
+    def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
+        try:
+            prompt = f"Analyze the following research task and select the appropriate sources:\n\nTask: {task}"
+            result: ResearchRoute = self._invoke_structured(prompt, ResearchRoute)
+            
+            return AgentOutput(
+                agent_name=self.name,
+                department=self.department,
+                success=True,
+                content=result.reasoning,
+                metadata={
+                    "sources": result.sources,
+                    "reasoning": result.reasoning
+                }
+            )
+        except Exception as e:
+            return AgentOutput(
+                agent_name=self.name,
+                department=self.department,
+                success=False,
+                content=f"Routing failed: {e}",
+                metadata={"sources": ["web_search_node"], "reasoning": "Fallback to web search due to routing error."},
+                error=str(e),
+            )
+
+
+
 # ─── ArxivResearchAgent ───────────────────────────────────────────────────────
 
 class ArxivResearchAgent(ProductionAgent):
@@ -120,6 +169,69 @@ class WikipediaAgent(ProductionAgent):
                     "evidence": evidence_list,
                     "raw_results": raw_wiki,
                     "evidence_formatted": evidence_text,
+                },
+            )
+        except Exception as e:
+            return AgentOutput(
+                agent_name=self.name,
+                department=self.department,
+                success=False,
+                content="",
+                error=str(e),
+            )
+
+
+# ─── RagSearchAgent (Internal Documents) ──────────────────────────────────────
+
+class RagSearchAgent(ProductionAgent):
+    name = "RagSearchAgent"
+    department = "research"
+    system_prompt = """You are an Internal Knowledge Base Analyst. You receive retrieved excerpts 
+    from the user's uploaded private documents (PDFs, Excel, etc).
+    
+    Your job is to extract structured evidence directly answering the user's query from these documents.
+    If the provided documents don't contain relevant information, state that clearly.
+    Always cite the source document name provided in the excerpts."""
+
+    def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
+        user_id = context.get("user_id") if context else None
+        if not user_id:
+            return AgentOutput(
+                agent_name=self.name,
+                department=self.department,
+                success=False,
+                content="Error: No user_id provided for secure document retrieval.",
+                error="missing user_id",
+            )
+
+        try:
+            from shared.tools.rag_retrieval import rag_document_search
+            # We enforce top_k=5 for thoroughness
+            raw_rag, confidence = rag_document_search(query=task, user_id=user_id, top_k=5)
+
+            prompt = f"Research question: {task}\n\nDocument Excerpts:\n{raw_rag}"
+            try:
+                result: SearchDraft = self._invoke_structured(prompt, SearchDraft)
+                draft_content = result.draft_answer if result and result.draft_answer else raw_rag
+                evidence_list = [e.model_dump() for e in result.evidence] if result and result.evidence else []
+            except Exception:
+                draft_content = raw_rag
+                evidence_list = []
+
+            evidence_text = "\n".join([
+                f"• [{e.get('source', 'Document')}]: {e.get('summary', '')}" for e in evidence_list
+            ]) if evidence_list else raw_rag[:500]
+
+            return AgentOutput(
+                agent_name=self.name,
+                department=self.department,
+                success=True,
+                content=draft_content,
+                metadata={
+                    "evidence": evidence_list,
+                    "raw_results": raw_rag,
+                    "evidence_formatted": evidence_text,
+                    "confidence": confidence,
                 },
             )
         except Exception as e:
