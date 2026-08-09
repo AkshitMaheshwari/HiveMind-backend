@@ -21,6 +21,7 @@ from fastapi.responses import FileResponse
 
 from api.routes.chat import router as chat_router
 from api.routes.upload import router as upload_router
+from api.routes.documents import router as documents_router
 from api.websocket.stream import manager
 from api.auth import verify_token
 from db.supabase_client import db_service
@@ -70,6 +71,7 @@ app.add_middleware(
 
 app.include_router(chat_router, prefix="/api", tags=["Chat"])
 app.include_router(upload_router, prefix="/api", tags=["Upload"])
+app.include_router(documents_router, prefix="/api", tags=["Documents"])
 
 
 
