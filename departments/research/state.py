@@ -17,6 +17,7 @@ class ResearchDeptState(TypedDict):
     active_sources: List[str]          # Sources selected by router (e.g. 'rag', 'arxiv', 'wikipedia', 'web')
     routing_reasoning: str             # Explanation of why the router selected these sources
     rag_fallback_triggered: bool       # True if RAG retrieved poor results and fallback to web is needed
+    rag_confidence: float              # Confidence score of RAG results
     search_results: str                # Raw web search output
     arxiv_evidence: List[Dict[str, Any]]  # Scientific paper findings from arXiv
     wikipedia_evidence: List[Dict[str, Any]] # Domain overview & background from Wikipedia

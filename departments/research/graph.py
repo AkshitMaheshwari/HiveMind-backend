@@ -96,21 +96,34 @@ def rag_search_node(state: ResearchDeptState) -> Dict[str, Any]:
     events = _emit(state, "agent_working", "RagSearchAgent", "Searching your private documents...")
     output = rag_agent.execute(state["task"], context={"user_id": state.get("user_id")})
 
+    confidence = output.metadata.get("confidence", 0.0)
+    
+    # Check if fallback is needed (e.g. confidence below 15%)
+    # Lowered threshold to 0.15 because instruction-heavy queries 
+    # (e.g. "Extract X...") inherently have lower cosine similarity 
+    # to factual document text.
+    fallback = confidence < 0.15
+
     events = _emit(
         {**state, "events": events},
         "agent_done",
         "RagSearchAgent",
-        "Document search complete",
+        f"Document search complete. Confidence: {confidence:.2f}",
     )
 
-    confidence = output.metadata.get("confidence", 0.0)
-    # Check if fallback is needed (e.g. confidence below 50% or 0 chunks)
-    fallback = confidence < 0.50
+    if fallback:
+        events = _emit(
+            {**state, "events": events},
+            "routing_decision",
+            "Research Router",
+            f"RAG confidence ({confidence:.2f}) is low. Triggering web_search_node fallback.",
+        )
 
     return {
         "rag_evidence": output.metadata.get("evidence", []),
         "rag_draft": output.content,
         "rag_fallback_triggered": fallback,
+        "rag_confidence": confidence,
         "events": events,
     }
 
@@ -220,7 +233,7 @@ def research_router_node(state: ResearchDeptState) -> Dict[str, Any]:
         {**state, "events": events},
         "agent_done",
         "ResearchRouterAgent",
-        f"Selected sources: {', '.join(sources)}",
+        f"Selected sources: {', '.join(sources)}. Reasoning: {reasoning}",
     )
 
     return {

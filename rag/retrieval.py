@@ -57,3 +57,43 @@ def retrieve_context(query: str, user_id: str, top_k: int = 0) -> str:
         formatted_chunks.append(f"[Source: {source}]\n{doc.page_content}")
 
     return "\n\n".join(formatted_chunks)
+
+from dataclasses import dataclass
+
+@dataclass
+class Chunk:
+    text: str
+    source: str
+    score: float
+
+def retrieve(query: str, user_id: str, top_k: int = 0) -> List[Chunk]:
+    if not query or not query.strip():
+        logger.warning("retrieve: empty query provided")
+        return []
+    if not user_id or not user_id.strip():
+        raise ValueError("retrieve: user_id must not be empty.")
+
+    k = top_k or TOP_K_RESULTS
+    store = get_vector_store()
+    
+    qdrant_filter = Filter(
+        must=[
+            FieldCondition(
+                key="metadata.user_id", match=MatchValue(value=user_id)
+            )
+        ]
+    )
+
+    try:
+        results = store.similarity_search_with_score(query, k=k, filter=qdrant_filter)
+    except Exception as exc:
+        logger.error("retrieve: search failed: %s", exc)
+        return []
+
+    chunks = []
+    for doc, score in results:
+        source = doc.metadata.get("source_identifier", "Unknown")
+        chunks.append(Chunk(text=doc.page_content, source=source, score=score))
+    
+    return chunks
+
