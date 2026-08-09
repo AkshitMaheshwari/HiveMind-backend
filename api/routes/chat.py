@@ -40,6 +40,7 @@ async def run_task_async(
     task_id: str,
     user_request: str,
     conversation_id: str,
+    user_id: str,
     api_keys: Optional[Dict[str, str]] = None,
     selected_model: Optional[str] = None,
 ):
@@ -54,6 +55,18 @@ async def run_task_async(
 
     await db_service.update_task(task_id, {"status": "running"})
 
+    # ── Fetch conversation history for memory context ──────────────
+    chat_history = []
+    if user_id and conversation_id and conversation_id != "default":
+        try:
+            chat_history = await db_service.get_conversation_history(
+                conversation_id=conversation_id,
+                user_id=user_id,
+                limit=10,
+            )
+        except Exception as hist_exc:
+            logger.warning("Could not fetch conversation history: %s", hist_exc)
+
     try:
         # Run in a thread pool to avoid blocking the event loop
         loop = asyncio.get_event_loop()
@@ -63,6 +76,7 @@ async def run_task_async(
             initial_state = {
                 "user_request": user_request,
                 "conversation_id": conversation_id,
+                "chat_history": chat_history,
                 "api_keys": api_keys,
                 "selected_model": selected_model,
                 "task_plan": None,
@@ -164,6 +178,7 @@ async def start_chat(
         task_id,
         request.message,
         request.conversation_id,
+        user_id,
         api_keys_dict,
         request.selected_model,
     )
@@ -212,6 +227,49 @@ async def list_admin_tasks(admin_user: Dict[str, Any] = Depends(require_admin_us
     """Admin endpoint: List all tasks across all users in the system."""
     tasks = await db_service.list_admin_all_tasks(limit=100)
     return tasks
+
+
+@router.get("/conversations")
+async def list_conversations(
+    user: Dict[str, Any] = Depends(require_authenticated_user),
+):
+    """List conversation threads for the current user (for sidebar)."""
+    user_id = user.get("id") if user else None
+    if not user_id:
+        return []
+    return await db_service.list_conversations(user_id=user_id)
+
+
+@router.get("/conversation/{conversation_id}/messages")
+async def get_conversation_messages(
+    conversation_id: str,
+    user: Dict[str, Any] = Depends(require_authenticated_user),
+):
+    """
+    Returns all tasks in a conversation thread as an ordered list of
+    {user_request, final_output, status, created_at} objects.
+    Used to reload a full chat thread when clicking a conversation in the sidebar.
+    """
+    user_id = user.get("id") if user else None
+    if not user_id:
+        return []
+    tasks = await db_service.list_tasks(
+        limit=100,
+        conversation_id=conversation_id,
+        user_id=user_id,
+    )
+    # Return in chronological order
+    tasks_sorted = sorted(tasks, key=lambda t: t.get("created_at", ""))
+    return [
+        {
+            "task_id": t.get("id") or t.get("task_id"),
+            "user_request": t.get("user_request", ""),
+            "final_output": t.get("final_output", ""),
+            "status": t.get("status"),
+            "created_at": t.get("created_at"),
+        }
+        for t in tasks_sorted
+    ]
 
 
 @router.delete("/task/{task_id}")

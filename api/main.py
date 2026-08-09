@@ -26,7 +26,6 @@ from api.auth import verify_token
 from db.supabase_client import db_service
 
 
-# ─── FastAPI App ──────────────────────────────────────────────────────────────
 
 app = FastAPI(
     title="Universal Multi-Agent Orchestrator",
@@ -45,7 +44,6 @@ async def startup_event() -> None:
         from shared.tools.registry_bootstrap import bootstrap
         bootstrap()
     except Exception as exc:
-        # Log loudly — a broken registry at startup is a hard failure.
         logger.critical(
             "Tool registry bootstrap FAILED — agents may not have access to tools: %s",
             exc,
@@ -58,12 +56,10 @@ async def startup_event() -> None:
         ensure_collection()
         logger.info("Qdrant vector collection initialised successfully.")
     except Exception as exc:
-        # Non-fatal: RAG won't work, but other agents still can.
         logger.warning(
             "Qdrant initialisation failed — RAG features will be unavailable: %s", exc
         )
 
-# ─── CORS ─────────────────────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -72,12 +68,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ─── API Routes ───────────────────────────────────────────────────────────────
 app.include_router(chat_router, prefix="/api", tags=["Chat"])
 app.include_router(upload_router, prefix="/api", tags=["Upload"])
 
 
-# ─── WebSocket ────────────────────────────────────────────────────────────────
+
 @app.websocket("/ws/{task_id}")
 async def websocket_endpoint(websocket: WebSocket, task_id: str, token: Optional[str] = Query(None)):
     """
@@ -87,7 +82,6 @@ async def websocket_endpoint(websocket: WebSocket, task_id: str, token: Optional
     user = await verify_token(token) if token else None
     user_id = user.get("id") if user else None
 
-    # Enforce task ownership when Supabase is connected
     if db_service.is_connected:
         if not user_id:
             await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Authentication required")

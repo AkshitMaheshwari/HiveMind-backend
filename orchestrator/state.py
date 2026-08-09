@@ -34,6 +34,11 @@ class OrchestratorState(TypedDict):
     api_keys: Optional[Dict[str, str]]
     selected_model: Optional[str]  # e.g. "gemini-2.0-flash", "llama-3.3-70b-versatile"
 
+    # ── Conversation Memory ────────────────────────────────────────
+    # List of prior turns: [{"role": "user"|"assistant", "content": "..."}]
+    # Fetched from DB before each invoke so agents have full context.
+    chat_history: List[Dict[str, str]]
+
     # ── CEO Routing ────────────────────────────────────────────────
     task_plan: Optional[Dict[str, Any]]       # CEO's JSON task plan
     active_departments: List[str]             # departments to run

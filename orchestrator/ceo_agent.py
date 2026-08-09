@@ -104,10 +104,21 @@ def ceo_router_node(state: OrchestratorState) -> Dict[str, Any]:
     events = emit_event(state, "ceo_planning", "CEO is analyzing your request...")
 
     try:
-        plan: TaskPlanOutput = structured_llm.invoke([
-            SystemMessage(content=CEO_SYSTEM_PROMPT),
-            HumanMessage(content=f"User request: {state['user_request']}"),
-        ])
+        # Build message list: prior turns + current request
+        from langchain_core.messages import AIMessage
+        messages = [SystemMessage(content=CEO_SYSTEM_PROMPT)]
+
+        for turn in state.get("chat_history", []):
+            role = turn.get("role", "user")
+            content = turn.get("content", "")
+            if role == "user":
+                messages.append(HumanMessage(content=content))
+            else:
+                messages.append(AIMessage(content=content))
+
+        messages.append(HumanMessage(content=f"User request: {state['user_request']}"))
+
+        plan: TaskPlanOutput = structured_llm.invoke(messages)
 
         task_plan = {
             "departments": plan.departments,

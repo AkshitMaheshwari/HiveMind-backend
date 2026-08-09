@@ -250,6 +250,104 @@ class SupabaseDatabaseService:
             return True
         return False
 
+    async def get_conversation_history(
+        self,
+        conversation_id: str,
+        user_id: str,
+        limit: int = 10,
+    ) -> List[Dict[str, str]]:
+        """
+        Returns the last `limit` completed turns in a conversation as
+        [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}] pairs.
+        Used to inject memory into the orchestrator on every new message.
+        """
+        tasks: List[Dict[str, Any]] = []
+
+        if self.client:
+            try:
+                resp = (
+                    self.client.table("tasks")
+                    .select("user_request, final_output, created_at")
+                    .eq("conversation_id", conversation_id)
+                    .eq("user_id", user_id)
+                    .eq("status", "done")
+                    .order("created_at", desc=True)
+                    .limit(limit)
+                    .execute()
+                )
+                tasks = resp.data or []
+            except Exception as e:
+                logger.error(f"Error fetching conversation history: {e}")
+        else:
+            tasks = [
+                t for t in self._in_memory_tasks.values()
+                if t.get("conversation_id") == conversation_id
+                and t.get("user_id") == user_id
+                and t.get("status") == "done"
+            ]
+            tasks = sorted(tasks, key=lambda x: x.get("created_at", ""), reverse=True)[:limit]
+
+        # Reverse so oldest turn is first (chronological order for LLM)
+        turns: List[Dict[str, str]] = []
+        for t in reversed(tasks):
+            if t.get("user_request"):
+                turns.append({"role": "user", "content": t["user_request"]})
+            if t.get("final_output"):
+                turns.append({"role": "assistant", "content": t["final_output"]})
+        return turns
+
+    async def list_conversations(
+        self, user_id: str, limit: int = 30
+    ) -> List[Dict[str, Any]]:
+        """
+        Returns distinct conversation threads for a user, each with:
+        - conversation_id
+        - first_message (the earliest user_request in that thread)
+        - last_updated (latest created_at)
+        - message_count
+        Used by the sidebar to show conversation threads instead of individual tasks.
+        """
+        if self.client:
+            try:
+                resp = (
+                    self.client.table("tasks")
+                    .select("conversation_id, user_request, created_at")
+                    .eq("user_id", user_id)
+                    .neq("status", "deleted")
+                    .order("created_at", desc=False)
+                    .execute()
+                )
+                rows = resp.data or []
+            except Exception as e:
+                logger.error(f"Error listing conversations: {e}")
+                rows = []
+        else:
+            rows = [
+                t for t in self._in_memory_tasks.values()
+                if t.get("user_id") == user_id and t.get("status") != "deleted"
+            ]
+
+        # Group by conversation_id
+        from collections import defaultdict
+        grouped: Dict[str, list] = defaultdict(list)
+        for row in rows:
+            cid = row.get("conversation_id", "default")
+            grouped[cid].append(row)
+
+        conversations = []
+        for cid, items in grouped.items():
+            items_sorted = sorted(items, key=lambda x: x.get("created_at", ""))
+            conversations.append({
+                "conversation_id": cid,
+                "first_message": (items_sorted[0].get("user_request") or "Untitled Chat")[:120],
+                "last_updated": items_sorted[-1].get("created_at", ""),
+                "message_count": len(items_sorted),
+            })
+
+        # Sort by last_updated desc, trim to limit
+        conversations.sort(key=lambda x: x["last_updated"], reverse=True)
+        return conversations[:limit]
+
     async def list_admin_all_tasks(self, limit: int = 100) -> List[Dict[str, Any]]:
         """Lists all system tasks across all users (Admin view)."""
         if self.client:
