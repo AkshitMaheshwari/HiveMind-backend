@@ -26,6 +26,7 @@ from departments.research.graph import research_department_node
 from departments.content.graph import content_department_node
 from departments.code.graph import code_department_node
 from departments.document.graph import document_department_node
+from departments.data_analyst.graph import data_analyst_department_node
 
 
 # ─── Routing function: CEO → Departments ─────────────────────────────────────
@@ -102,6 +103,7 @@ def build_orchestrator_graph() -> StateGraph:
     graph.add_node("content_department_node", content_department_node)
     graph.add_node("code_department_node", code_department_node)
     graph.add_node("document_department_node", document_department_node)
+    graph.add_node("data_analyst_department_node", data_analyst_department_node)
     graph.add_node("aggregator_node", aggregator_node)
 
     # ── Edges ──────────────────────────────────────────────────────────────────
@@ -117,12 +119,13 @@ def build_orchestrator_graph() -> StateGraph:
             "content_department_node": "content_department_node",
             "code_department_node": "code_department_node",
             "document_department_node": "document_department_node",
+            "data_analyst_department_node": "data_analyst_department_node",
             "aggregator_node": "aggregator_node",
         },
     )
 
     # After each department → next department or aggregator
-    for dept in ["research", "content", "code", "document"]:
+    for dept in ["research", "content", "code", "document", "data_analyst"]:
         graph.add_conditional_edges(
             f"{dept}_department_node",
             route_after_department,
@@ -131,6 +134,7 @@ def build_orchestrator_graph() -> StateGraph:
                 "content_department_node": "content_department_node",
                 "code_department_node": "code_department_node",
                 "document_department_node": "document_department_node",
+                "data_analyst_department_node": "data_analyst_department_node",
                 "aggregator_node": "aggregator_node",
             },
         )

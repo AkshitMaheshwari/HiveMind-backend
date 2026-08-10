@@ -9,7 +9,7 @@ from typing import Any, Dict
 from langgraph.graph import StateGraph, START, END
 
 from departments.code.state import CodeDeptState
-from departments.code.agents import CodeGeneratorAgent, DebuggerAgent, DocWriterAgent
+from departments.code.agents import CodeGeneratorAgent, DebuggerAgent, DocWriterAgent, UXDesignerAgent, UIReviewerAgent
 from shared.tools import execute_code
 
 
@@ -17,11 +17,13 @@ from shared.tools import execute_code
 
 def _make_agents(api_keys=None, selected_model=None):
     """Create fresh agent instances with the given API keys and model."""
-    return (
-        CodeGeneratorAgent(api_keys=api_keys, selected_model=selected_model),
-        DebuggerAgent(api_keys=api_keys, selected_model=selected_model),
-        DocWriterAgent(api_keys=api_keys, selected_model=selected_model),
-    )
+    return {
+        "code_gen": CodeGeneratorAgent(api_keys=api_keys, selected_model=selected_model),
+        "debugger": DebuggerAgent(api_keys=api_keys, selected_model=selected_model),
+        "doc_writer": DocWriterAgent(api_keys=api_keys, selected_model=selected_model),
+        "ux_designer": UXDesignerAgent(api_keys=api_keys, selected_model=selected_model),
+        "ui_reviewer": UIReviewerAgent(api_keys=api_keys, selected_model=selected_model),
+    }
 
 
 def _emit(state: CodeDeptState, event: str, agent: str, data: str = "") -> list:
@@ -38,13 +40,42 @@ def _emit(state: CodeDeptState, event: str, agent: str, data: str = "") -> list:
 
 # ─── Graph Nodes ──────────────────────────────────────────────────────────────
 
+async def ux_designer_node(state: CodeDeptState) -> Dict[str, Any]:
+    """UX Designer — plans the UI/UX system if needed."""
+    agents = _make_agents(state.get("api_keys"), state.get("selected_model"))
+    ux_designer = agents["ux_designer"]
+
+    events = _emit(state, "agent_working", "UXDesignerAgent", "Analyzing task for UI/UX requirements...")
+    output = await ux_designer.execute(state["task"])
+
+    is_web_ui = output.metadata.get("is_web_ui", False)
+    
+    events = _emit(
+        {**state, "events": events},
+        "agent_done",
+        "UXDesignerAgent",
+        "UX Design System ready" if is_web_ui else "No UI required",
+    )
+
+    return {
+        "is_web_ui_task": is_web_ui,
+        "ux_design_system": output.content if is_web_ui else "",
+        "events": events,
+    }
+
+
 async def code_generator_node(state: CodeDeptState) -> Dict[str, Any]:
     """Code Generator — writes the initial code solution."""
-    code_gen, _, _ = _make_agents(state.get("api_keys"), state.get("selected_model"))
+    agents = _make_agents(state.get("api_keys"), state.get("selected_model"))
+    code_gen = agents["code_gen"]
 
     events = _emit(state, "agent_working", "CodeGeneratorAgent", "Generating code solution...")
 
-    output = await code_gen.execute(state["task"])
+    context = {
+        "ux_design_system": state.get("ux_design_system", ""),
+        "ui_feedback": state.get("ui_feedback", "")
+    }
+    output = await code_gen.execute(state["task"], context=context)
 
     events = _emit(
         {**state, "events": events},
@@ -64,7 +95,8 @@ async def code_generator_node(state: CodeDeptState) -> Dict[str, Any]:
 
 async def debugger_node(state: CodeDeptState) -> Dict[str, Any]:
     """Debugger — runs code in sandbox (Python) or verifies web code (HTML/JS/CSS)."""
-    _, debugger, _ = _make_agents(state.get("api_keys"), state.get("selected_model"))
+    agents = _make_agents(state.get("api_keys"), state.get("selected_model"))
+    debugger = agents["debugger"]
 
     events = _emit(state, "agent_working", "DebuggerAgent", "Testing code in sandbox...")
 
@@ -124,9 +156,41 @@ async def debugger_node(state: CodeDeptState) -> Dict[str, Any]:
     }
 
 
+async def ui_reviewer_node(state: CodeDeptState) -> Dict[str, Any]:
+    """UI Reviewer — critiques the UI/UX of web tasks."""
+    if not state.get("is_web_ui_task"):
+        return {"ui_approved": True, "ui_feedback": ""}
+
+    agents = _make_agents(state.get("api_keys"), state.get("selected_model"))
+    ui_reviewer = agents["ui_reviewer"]
+
+    events = _emit(state, "agent_working", "UIReviewerAgent", "Reviewing UI aesthetics and UX...")
+    
+    output = await ui_reviewer.execute(
+        state["task"],
+        context={"generated_code": state.get("fixed_code") or state.get("generated_code", "")}
+    )
+
+    approved = output.metadata.get("approved", True)
+    
+    events = _emit(
+        {**state, "events": events},
+        "agent_done",
+        "UIReviewerAgent",
+        "UI Approved ✨" if approved else "UI Rejected ❌ (Requesting revision)",
+    )
+
+    return {
+        "ui_approved": approved,
+        "ui_feedback": output.content if not approved else "",
+        "events": events,
+    }
+
+
 async def doc_writer_node(state: CodeDeptState) -> Dict[str, Any]:
     """Doc Writer — generates documentation or formatted web deliverable."""
-    _, _, doc_writer = _make_agents(state.get("api_keys"), state.get("selected_model"))
+    agents = _make_agents(state.get("api_keys"), state.get("selected_model"))
+    doc_writer = agents["doc_writer"]
 
     lang = (state.get("_language") or "python").lower()
     final_code_display = state.get("fixed_code") or state.get("generated_code", "")
@@ -200,17 +264,39 @@ async def doc_writer_node(state: CodeDeptState) -> Dict[str, Any]:
     }
 
 
+# ─── Routing ──────────────────────────────────────────────────────────────────
+
+def route_after_ui_reviewer(state: CodeDeptState) -> str:
+    """If UI is rejected, go back to code_generator, else doc_writer."""
+    if state.get("ui_approved", True):
+        return "doc_writer_node"
+    return "code_generator_node"
+
+
 # ─── Build the Code Subgraph ──────────────────────────────────────────────────
 
 code_graph = StateGraph(CodeDeptState)
 
+code_graph.add_node("ux_designer_node", ux_designer_node)
 code_graph.add_node("code_generator_node", code_generator_node)
 code_graph.add_node("debugger_node", debugger_node)
+code_graph.add_node("ui_reviewer_node", ui_reviewer_node)
 code_graph.add_node("doc_writer_node", doc_writer_node)
 
-code_graph.add_edge(START, "code_generator_node")
+code_graph.add_edge(START, "ux_designer_node")
+code_graph.add_edge("ux_designer_node", "code_generator_node")
 code_graph.add_edge("code_generator_node", "debugger_node")
-code_graph.add_edge("debugger_node", "doc_writer_node")
+code_graph.add_edge("debugger_node", "ui_reviewer_node")
+
+code_graph.add_conditional_edges(
+    "ui_reviewer_node",
+    route_after_ui_reviewer,
+    {
+        "code_generator_node": "code_generator_node",
+        "doc_writer_node": "doc_writer_node",
+    },
+)
+
 code_graph.add_edge("doc_writer_node", END)
 
 code_subgraph = code_graph.compile()

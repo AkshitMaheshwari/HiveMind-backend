@@ -1,11 +1,11 @@
 """
-Code Department State
+Data Analyst Department State
 """
 from typing import Any, Dict, List, Optional
 from typing_extensions import TypedDict
 
 
-class CodeDeptState(TypedDict):
+class DataAnalystDeptState(TypedDict):
     # ── Input ──────────────────────────────────────────────────────
     task: str
     original_request: str
@@ -13,20 +13,16 @@ class CodeDeptState(TypedDict):
     selected_model: Optional[str]        # User's chosen model id
 
     # ── Internal pipeline ──────────────────────────────────────────
-    problem_description: str      # Parsed/clarified problem
-    is_web_ui_task: bool          # Is this a front-end/UI task?
-    ux_design_system: str         # Generated UX plan (color, typography, layout)
-    generated_code: str           # Raw generated code
-    execution_stdout: str         # Execution output
-    execution_stderr: str         # Execution errors
-    execution_success: bool       # Did it run cleanly?
-    fixed_code: str               # Debugger's fix (if errors)
-    ui_feedback: str              # Feedback from UIReviewerAgent
-    ui_approved: bool             # Has UIReviewerAgent approved the UI?
-    documentation: str            # Generated README/docstrings
+    analysis_plan: str            # Output of DataPlannerAgent
+    eda_code: str                 # Generated EDA python code
+    execution_stdout: str         # Output of EDA python code
+    execution_stderr: str         # Error of EDA python code
+    execution_success: bool       # Did EDA run cleanly?
+    insights: str                 # Textual insights generated from execution
+    dashboard_code: str           # Generated dashboard code (e.g. Streamlit or HTML/JS)
 
     # ── Output ─────────────────────────────────────────────────────
-    final_report: str
+    final_report: str             # Final markdown report with embedded dashboard/insights
 
     # ── Events ─────────────────────────────────────────────────────
     events: List[Dict[str, Any]]

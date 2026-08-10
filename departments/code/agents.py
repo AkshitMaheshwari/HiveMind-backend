@@ -13,6 +13,18 @@ from shared.tools import execute_code
 
 # ─── Pydantic schemas ─────────────────────────────────────────────────────────
 
+class UXDesignSystem(BaseModel):
+    is_web_ui: bool = Field(description="True if the request requires a visual UI, website, dashboard, or frontend.")
+    color_palette: List[str] = Field(description="Hex codes for the color palette")
+    typography: str = Field(description="Font family recommendations")
+    layout_structure: str = Field(description="Description of the overall layout (e.g., Grid, Flexbox, Sidebar)")
+    animations: str = Field(description="Recommended micro-interactions and animations")
+    design_rationale: str = Field(description="Why this design was chosen")
+
+class UIReviewFeedback(BaseModel):
+    approved: bool = Field(description="True if the UI meets high aesthetic and functional standards.")
+    feedback: str = Field(description="Detailed feedback or list of improvements needed if rejected.")
+
 class GeneratedCode(BaseModel):
     language: str = Field(description="Programming language used")
     code: str = Field(description="Complete, runnable code")
@@ -55,11 +67,18 @@ CRITICAL RULES:
 Output structured JSON with language, code, explanation, and dependencies."""
 
     async def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
+        ux_context = ""
+        if context and context.get("ux_design_system"):
+            ux_context = f"\n\nUX DESIGN SYSTEM TO STRICTLY FOLLOW:\n{context.get('ux_design_system')}"
+            
+        ui_feedback = ""
+        if context and context.get("ui_feedback"):
+            ui_feedback = f"\n\nUI REVIEWER FEEDBACK TO INCORPORATE:\n{context.get('ui_feedback')}"
+
+        prompt = f"Coding task: {task}{ux_context}{ui_feedback}\n\nWrite complete, production-ready code for this task."
+        
         try:
-            result: GeneratedCode = await self._ainvoke_structured(
-                f"Coding task: {task}\n\nWrite complete, production-ready code for this task.",
-                GeneratedCode,
-            )
+            result: GeneratedCode = await self._ainvoke_structured(prompt, GeneratedCode)
             return AgentOutput(
                 agent_name=self.name,
                 department=self.department,
@@ -105,6 +124,85 @@ Output structured JSON with language, code, explanation, and dependencies."""
                     error=str(e2),
                 )
 
+
+# ─── UXDesignerAgent ──────────────────────────────────────────────────────────
+
+class UXDesignerAgent(ProductionAgent):
+    name = "UXDesignerAgent"
+    department = "code"
+    system_prompt = """You are an elite UX/UI Designer and Creative Director.
+Your job is to read the user's request and determine if a visual UI is needed. 
+If it is, you must output a stunning, modern, and highly aesthetic design system.
+Focus on:
+- Vibrant, harmonious color palettes (use HSL or exact hex codes).
+- Modern typography (e.g., Inter, Roboto, Outfit).
+- Glassmorphism, subtle gradients, and dark modes if applicable.
+- Dynamic layouts and micro-interactions (hover effects, transitions).
+If the task does not require a UI (e.g. backend script, CLI tool, data processing), set is_web_ui to False.
+"""
+
+    async def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
+        try:
+            result: UXDesignSystem = await self._ainvoke_structured(
+                f"Analyze this task and design a UX system if it's a UI task: {task}",
+                UXDesignSystem
+            )
+            
+            if not result.is_web_ui:
+                return AgentOutput(
+                    agent_name=self.name, department=self.department, success=True,
+                    content="No UI required.", metadata={"is_web_ui": False}
+                )
+                
+            design_summary = (
+                f"Colors: {', '.join(result.color_palette)}\n"
+                f"Typography: {result.typography}\n"
+                f"Layout: {result.layout_structure}\n"
+                f"Animations: {result.animations}\n"
+                f"Rationale: {result.design_rationale}"
+            )
+            return AgentOutput(
+                agent_name=self.name, department=self.department, success=True,
+                content=design_summary, metadata={"is_web_ui": True}
+            )
+        except Exception as e:
+            return AgentOutput(
+                agent_name=self.name, department=self.department, success=False,
+                content="Failed to generate UX design.", error=str(e), metadata={"is_web_ui": False}
+            )
+
+
+# ─── UIReviewerAgent ──────────────────────────────────────────────────────────
+
+class UIReviewerAgent(ProductionAgent):
+    name = "UIReviewerAgent"
+    department = "code"
+    system_prompt = """You are a ruthless UI/UX Design Critic and Senior Frontend Engineer.
+Your job is to review the generated HTML/CSS/JS code and determine if it meets the highest aesthetic standards.
+- Look for modern design practices (responsive, good padding/margins, appealing colors, hover states, transitions).
+- If it looks like a basic 90s website or lacks visual flair, REJECT IT and provide specific feedback on how to make it stunning (e.g., "Add a dark mode gradient background", "Use backdrop-filter for glassmorphism on the cards").
+- If it looks beautiful and modern, APPROVE IT.
+"""
+
+    async def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
+        code = context.get("generated_code", "") if context else ""
+        if not code:
+            return AgentOutput(agent_name=self.name, department=self.department, success=True, content="No code to review.", metadata={"approved": True})
+            
+        prompt = f"Review this code for UI/UX aesthetics based on the task: {task}\n\nCode:\n```html\n{code[:4000]}\n```"
+        
+        try:
+            result: UIReviewFeedback = await self._ainvoke_structured(prompt, UIReviewFeedback)
+            return AgentOutput(
+                agent_name=self.name, department=self.department, success=True,
+                content=result.feedback, metadata={"approved": result.approved}
+            )
+        except Exception as e:
+            # Fallback to approve if parsing fails
+            return AgentOutput(
+                agent_name=self.name, department=self.department, success=True,
+                content=f"Error in review, proceeding. ({e})", metadata={"approved": True}
+            )
 
 # ─── DebuggerAgent ────────────────────────────────────────────────────────────
 
