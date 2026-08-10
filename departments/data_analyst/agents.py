@@ -75,9 +75,9 @@ class EDAAgent(ProductionAgent):
     department = "data_analyst"
     system_prompt = """You are a Senior Data Engineer and Data Scientist.
 Your job is to write Python code that performs Exploratory Data Analysis (EDA), calculates the requested KPIs, and prepares the data for visualization.
-You MUST output print statements for all key statistics and data aggregations so that the output can be read by the InsightsAgent.
+CRITICAL: You MUST print out the final *summarized and aggregated* statistics (e.g., grouped by category, counts, averages) as clean JSON or tabular data in stdout. 
+Do NOT print the entire raw dataframe. The DashboardAgent relies on your stdout to build charts, so make sure all numbers needed for charts are clearly printed.
 Use pandas, numpy, and scikit-learn as needed.
-Assume the data is accessible locally if a path is provided, or create mock data if no dataset is provided but the user wants a demonstration.
 Output structured JSON with language (python), code, explanation, and dependencies."""
 
     async def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
@@ -132,30 +132,30 @@ Output structured JSON with key_findings and a brief narrative."""
 class DashboardAgent(ProductionAgent):
     name = "DashboardAgent"
     department = "data_analyst"
-    system_prompt = """You are an expert Data Visualization Engineer and UI/UX Designer.
-Your job is to generate a fully self-contained HTML file that acts as a highly interactive, stunning "Power BI" style dashboard.
-- Use pure HTML, modern CSS (Tailwind via CDN or custom CSS with flex/grid, glassmorphism, dark themes), and JavaScript.
-- Use Plotly.js (via CDN: https://cdn.plot.ly/plotly-latest.min.js) or Chart.js for all interactive charts and graphs.
-- Hardcode the summarized data from the insights/EDA into the JavaScript so the charts render immediately without a backend.
-- Include KPI cards at the top, followed by a grid of charts.
-- The dashboard MUST look extremely premium, responsive, and visually impressive.
+    system_prompt = """You are an expert Data Journalist and UI Developer.
+Your job is to generate a fully self-contained HTML file that acts as a stunning, premium interactive data report (like a high-end NYT data journalism article).
+- Use pure HTML, modern CSS (Tailwind via CDN), and JavaScript.
+- Apply modern, visual-first styling: dark mode, glassmorphism, flex/grid layouts, clean typography.
+- Use Plotly.js (via CDN: https://cdn.plot.ly/plotly-latest.min.js) for all interactive charts and graphs.
+- CRITICAL: Since you are writing HTML for a browser, you CANNOT read local files. You MUST hardcode the aggregated statistics and data points (provided in your prompt from the EDA output) directly into the JavaScript `Plotly.newPlot` data structures.
+- Do NOT just create a grid of charts. Intertwine the textual insights provided into the HTML seamlessly (e.g., a nice header, followed by a paragraph of insight, followed by the relevant chart).
+- The dashboard MUST look extremely premium and visually impressive.
 Output structured JSON with language (html), code, explanation, and dependencies."""
 
     async def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
         plan = context.get("analysis_plan", "") if context else ""
         insights = context.get("insights", "") if context else ""
         eda_output = context.get("execution_stdout", "") if context else ""
-        
         prompt = f"""Original Request: {task}
         
 Analysis Plan: {plan}
 
 Key Insights Discovered: {insights}
 
-Raw Data/Stats (Embed this data into your charts):
+Aggregated Data/Stats (Embed this data into your charts):
 {eda_output[:5000]}
 
-Generate a stunning, single-file HTML/JS dashboard using Plotly.js representing these insights."""
+Generate a stunning, single-file HTML/JS interactive report using Plotly.js and Tailwind CSS representing these insights."""
         
         try:
             result: GeneratedCode = await self._ainvoke_structured(prompt, GeneratedCode)

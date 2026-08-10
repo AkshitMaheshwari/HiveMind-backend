@@ -111,28 +111,31 @@ async def dashboard_node(state: DataAnalystDeptState) -> Dict[str, Any]:
     agents = _make_agents(state.get("api_keys"), state.get("selected_model"))
     dashboard = agents["dashboard"]
 
-    events = _emit(state, "agent_working", "DashboardAgent", "Building interactive Power BI style dashboard...")
+    events = _emit(state, "agent_working", "DashboardAgent", "Building interactive HTML report...")
     
     context = {
         "analysis_plan": state.get("analysis_plan", ""),
         "insights": state.get("insights", ""),
-        "execution_stdout": state.get("execution_stdout", "")
+        "execution_stdout": state.get("execution_stdout", ""),
+        "user_id": state.get("user_id", "")
     }
     output = await dashboard.execute(state["task"], context=context)
     
-    events = _emit({**state, "events": events}, "agent_done", "DashboardAgent", "Dashboard ready.")
+    events = _emit({**state, "events": events}, "agent_done", "DashboardAgent", "Interactive report ready.")
     
     dashboard_code = output.content
-    final_report = f"""## 📊 Data Analyst Report & Dashboard
+    final_report = f"""## 📊 Data Analyst Interactive Report
 
 ### 💡 Key Insights
 {state.get("insights", "")}
 
-### 📈 Interactive Dashboard (HTML/JS)
+### 📈 Interactive Live Report
 ```html
 {dashboard_code}
 ```
-> 💡 **Tip:** Click the **👁️ Live Preview** tab at the top of this message to interact with your dashboard!
+
+> [!TIP]
+> **Live Preview:** Click the **👁️ Live Preview** tab at the top of this message (or **↗️ Fullscreen**) to view and interact with your report directly in the browser!
 """
     
     return {
