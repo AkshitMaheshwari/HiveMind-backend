@@ -14,13 +14,17 @@ class DataAnalystDeptState(TypedDict):
     selected_model: Optional[str]        # User's chosen model id
 
     # ── Internal pipeline ──────────────────────────────────────────
-    analysis_plan: str            # Output of DataPlannerAgent
+    analysis_plan: Dict[str, Any] # Structured output of DataPlannerAgent
     eda_code: str                 # Generated EDA python code
     execution_stdout: str         # Output of EDA python code
     execution_stderr: str         # Error of EDA python code
     execution_success: bool       # Did EDA run cleanly?
-    insights: str                 # Textual insights generated from execution
-    dashboard_code: str           # Generated dashboard code (e.g. Streamlit or HTML/JS)
+    dataset_info: Dict[str, Any]  # Parsed JSON of dataset info from EDA stdout
+    eda_results: Dict[str, Any]   # Parsed JSON of EDA results from EDA stdout
+    insights: Dict[str, Any]      # Structured insights (anomalies, risks, recommendations)
+    review: Dict[str, Any]        # Review output (feedback, scores)
+    dashboard_code: str           # Generated dashboard code (HTML/JS)
+    structured_output: Dict[str, Any] # The final massive structured JSON payload
 
     # ── Output ─────────────────────────────────────────────────────
     final_report: str             # Final markdown report with embedded dashboard/insights

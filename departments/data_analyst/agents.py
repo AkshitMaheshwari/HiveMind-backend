@@ -13,11 +13,20 @@ from shared.base_agent import ProductionAgent, AgentOutput
 
 # ─── Pydantic schemas ─────────────────────────────────────────────────────────
 
+class AnalysisTask(BaseModel):
+    step: int
+    agent: str
+    action: str
+    target_columns: List[str]
+    title: str
+    reason: str
+    additional_notes: str
+
 class AnalysisPlan(BaseModel):
-    key_metrics: List[str] = Field(description="List of key metrics and KPIs to calculate")
-    visualizations: List[str] = Field(description="Specific charts/graphs needed (e.g., 'Bar chart of sales by region')")
-    predictions_needed: str = Field(description="Any specific predictions or trends to calculate")
-    plan_rationale: str = Field(description="Why this plan will provide the best insights")
+    dataset_type: str
+    priority: str
+    summary_of_approach: str
+    tasks: List[AnalysisTask]
 
 
 class GeneratedCode(BaseModel):
@@ -28,8 +37,23 @@ class GeneratedCode(BaseModel):
 
 
 class DataInsights(BaseModel):
-    key_findings: List[str] = Field(description="The most important actionable insights discovered")
-    narrative: str = Field(description="A brief paragraph summarizing the data story to be included in the dashboard")
+    executive_summary: str
+    key_findings: List[str]
+    anomalies: List[str]
+    business_risks: List[str]
+    trends: List[str]
+    recommendations: List[str]
+    report: str = Field(description="A comprehensive, beautifully formatted Markdown report combining all findings")
+
+
+class ReviewFeedback(BaseModel):
+    passed: bool
+    review_score: int
+    strengths: List[str]
+    feedback: List[str]
+    missing_visualizations: List[str]
+    missing_analysis: List[str]
+    next_actions: List[str]
 
 
 # ─── DataPlannerAgent ─────────────────────────────────────────────────────────
@@ -38,10 +62,8 @@ class DataPlannerAgent(ProductionAgent):
     name = "DataPlannerAgent"
     department = "data_analyst"
     system_prompt = """You are a Lead Data Scientist and Analytics Manager.
-Your job is to read the user's data request and formulate a precise plan for analysis and visualization.
-Focus heavily on what should be visualized to make an impactful, Power BI style dashboard.
-Identify the key metrics (KPIs), the necessary charts/graphs, and any predictive trends required.
-Output structured JSON with key_metrics, visualizations, predictions_needed, and plan_rationale."""
+Your job is to read the user's data request and formulate a highly structured, systematic plan for exploratory data analysis (EDA).
+Output a massive, deeply structured JSON object outlining the step-by-step tasks, which agents will handle them, and exactly what columns and actions to take."""
 
     async def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
         user_id = context.get("user_id", "") if context else ""
@@ -52,10 +74,8 @@ Output structured JSON with key_metrics, visualizations, predictions_needed, and
                 AnalysisPlan
             )
             content = (
-                f"**Metrics**: {', '.join(result.key_metrics)}\n"
-                f"**Visualizations**: {', '.join(result.visualizations)}\n"
-                f"**Predictions**: {result.predictions_needed}\n"
-                f"**Rationale**: {result.plan_rationale}"
+                f"**Approach**: {result.summary_of_approach}\n"
+                f"**Tasks Planned**: {len(result.tasks)}"
             )
             return AgentOutput(
                 agent_name=self.name, department=self.department, success=True,
@@ -74,10 +94,13 @@ class EDAAgent(ProductionAgent):
     name = "EDAAgent"
     department = "data_analyst"
     system_prompt = """You are a Senior Data Engineer and Data Scientist.
-Your job is to write Python code that performs Exploratory Data Analysis (EDA), calculates the requested KPIs, and prepares the data for visualization.
-CRITICAL: You MUST print out the final *summarized and aggregated* statistics (e.g., grouped by category, counts, averages) as clean JSON or tabular data in stdout. 
-Do NOT print the entire raw dataframe. The DashboardAgent relies on your stdout to build charts, so make sure all numbers needed for charts are clearly printed.
-Use pandas, numpy, and scikit-learn as needed.
+Your job is to write Python code that performs Exploratory Data Analysis (EDA).
+CRITICAL: Your script MUST `print()` a single, valid JSON object (and absolutely nothing else) to stdout. 
+The JSON object MUST contain exactly two top-level keys:
+1. `dataset_info`: A dictionary containing `rows`, `columns`, `column_names`, `numeric_columns`, `categorical_columns`, `missing_values`.
+2. `eda_results`: Deep statistical results containing `summary_statistics`, `missing_value_analysis`, `outlier_detection`, and `correlation_analysis`.
+Do NOT print raw dataframes. Ensure your Python script dumps a beautifully nested JSON object using `json.dumps()`.
+Use pandas, numpy, and scikit-learn.
 Output structured JSON with language (python), code, explanation, and dependencies."""
 
     async def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
@@ -105,25 +128,51 @@ class InsightsAgent(ProductionAgent):
     name = "InsightsAgent"
     department = "data_analyst"
     system_prompt = """You are an expert Data Storyteller and Business Analyst.
-Your job is to read the raw statistical output from an EDA script and translate it into brief, highly actionable insights.
-Do NOT write long essays. Focus on the 'So What?'. 
-These insights will be displayed on a dashboard, so keep them punchy.
-Output structured JSON with key_findings and a brief narrative."""
+Your job is to read the highly structured `dataset_info` and `eda_results` from the EDA script and translate it into deep, highly actionable business insights.
+Extract anomalies, business risks, trends, and generate a comprehensive executive summary and markdown report.
+Output a massively structured JSON object matching the requested schema exactly."""
 
     async def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
         stdout = context.get("execution_stdout", "") if context else ""
-        prompt = f"Original Task: {task}\n\nEDA Script Output:\n{stdout[:5000]}\n\nGenerate actionable insights."
+        prompt = f"Original Task: {task}\n\nEDA Script Output (JSON):\n{stdout[:15000]}\n\nGenerate massive, structured, actionable insights."
         try:
             result: DataInsights = await self._ainvoke_structured(prompt, DataInsights)
-            content = f"**Story**: {result.narrative}\n**Key Findings**:\n- " + "\n- ".join(result.key_findings)
             return AgentOutput(
                 agent_name=self.name, department=self.department, success=True,
-                content=content, metadata=result.model_dump()
+                content=result.report, metadata=result.model_dump()
             )
         except Exception as e:
             return AgentOutput(
                 agent_name=self.name, department=self.department, success=False,
                 content="Failed to generate insights.", error=str(e)
+            )
+
+
+# ─── ReviewAgent ──────────────────────────────────────────────────────────────
+
+class ReviewAgent(ProductionAgent):
+    name = "ReviewAgent"
+    department = "data_analyst"
+    system_prompt = """You are a Principal Data Scientist and Peer Reviewer.
+Your job is to critically review the generated Insights, Report, and EDA results.
+Ensure statistical correctness, check for hallucinations, and provide constructive feedback on missing visualisations or analysis.
+Output structured JSON with a strict peer-review feedback format."""
+
+    async def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
+        eda_output = context.get("execution_stdout", "") if context else ""
+        insights = context.get("insights", {}) if context else {}
+        prompt = f"Task: {task}\n\nEDA Results: {eda_output[:5000]}\n\nGenerated Insights: {insights}\n\nProvide a strict peer review."
+        try:
+            result: ReviewFeedback = await self._ainvoke_structured(prompt, ReviewFeedback)
+            return AgentOutput(
+                agent_name=self.name, department=self.department, success=result.passed,
+                content=f"Review Score: {result.review_score}/10. Passed: {result.passed}", 
+                metadata=result.model_dump()
+            )
+        except Exception as e:
+            return AgentOutput(
+                agent_name=self.name, department=self.department, success=False,
+                content="Failed to review.", error=str(e)
             )
 
 
@@ -150,12 +199,13 @@ Output structured JSON with language (html), code, explanation, and dependencies
         
 Analysis Plan: {plan}
 
-Key Insights Discovered: {insights}
+Key Insights, Risks, and Report: {insights}
 
-Aggregated Data/Stats (Embed this data into your charts):
-{eda_output[:5000]}
+Aggregated Data/Stats from Python:
+{eda_output[:10000]}
 
-Generate a stunning, single-file HTML/JS interactive report using Plotly.js and Tailwind CSS representing these insights."""
+Generate a stunning, single-file HTML/JS interactive report using Plotly.js and Tailwind CSS. 
+Embed the textual report and insights alongside interactive charts generated from the aggregated data!"""
         
         try:
             result: GeneratedCode = await self._ainvoke_structured(prompt, GeneratedCode)

@@ -9,8 +9,9 @@ from typing import Any, Dict
 from langgraph.graph import StateGraph, START, END
 
 from departments.data_analyst.state import DataAnalystDeptState
-from departments.data_analyst.agents import DataPlannerAgent, EDAAgent, InsightsAgent, DashboardAgent
+from departments.data_analyst.agents import DataPlannerAgent, EDAAgent, InsightsAgent, ReviewAgent, DashboardAgent
 from shared.tools import execute_code
+import json
 
 
 def _make_agents(api_keys=None, selected_model=None):
@@ -18,6 +19,7 @@ def _make_agents(api_keys=None, selected_model=None):
         "planner": DataPlannerAgent(api_keys=api_keys, selected_model=selected_model),
         "eda": EDAAgent(api_keys=api_keys, selected_model=selected_model),
         "insights": InsightsAgent(api_keys=api_keys, selected_model=selected_model),
+        "review": ReviewAgent(api_keys=api_keys, selected_model=selected_model),
         "dashboard": DashboardAgent(api_keys=api_keys, selected_model=selected_model),
     }
 
@@ -75,6 +77,26 @@ async def execution_node(state: DataAnalystDeptState) -> Dict[str, Any]:
     code = state.get("eda_code", "")
     exec_result = await asyncio.to_thread(execute_code, code)
     
+    stdout = exec_result["stdout"]
+    
+    dataset_info = {}
+    eda_results = {}
+    try:
+        # Extract the JSON block printed by the script
+        import re
+        json_match = re.search(r'(\{.*\})', stdout.replace('\n', ' '), re.DOTALL)
+        if json_match:
+            parsed = json.loads(json_match.group(1))
+            dataset_info = parsed.get("dataset_info", {})
+            eda_results = parsed.get("eda_results", {})
+        else:
+            # Fallback if the whole stdout is JSON
+            parsed = json.loads(stdout)
+            dataset_info = parsed.get("dataset_info", {})
+            eda_results = parsed.get("eda_results", {})
+    except Exception as e:
+        pass  # Will be handled gracefully down the line
+
     events = _emit(
         {**state, "events": events},
         "agent_done",
@@ -86,6 +108,8 @@ async def execution_node(state: DataAnalystDeptState) -> Dict[str, Any]:
         "execution_stdout": exec_result["stdout"],
         "execution_stderr": exec_result["stderr"],
         "execution_success": exec_result["success"],
+        "dataset_info": dataset_info,
+        "eda_results": eda_results,
         "events": events,
     }
 
@@ -102,7 +126,27 @@ async def insights_node(state: DataAnalystDeptState) -> Dict[str, Any]:
     events = _emit({**state, "events": events}, "agent_done", "InsightsAgent", "Insights generated.")
     
     return {
-        "insights": output.content,
+        "insights": output.metadata if output.success else {},
+        "events": events,
+    }
+
+
+async def review_node(state: DataAnalystDeptState) -> Dict[str, Any]:
+    agents = _make_agents(state.get("api_keys"), state.get("selected_model"))
+    review = agents["review"]
+
+    events = _emit(state, "agent_working", "ReviewAgent", "Reviewing generated insights and EDA...")
+    
+    context = {
+        "execution_stdout": state.get("execution_stdout", ""),
+        "insights": state.get("insights", {})
+    }
+    output = await review.execute(state["task"], context=context)
+    
+    events = _emit({**state, "events": events}, "agent_done", "ReviewAgent", "Peer review completed.")
+    
+    return {
+        "review": output.metadata if output.success else {},
         "events": events,
     }
 
@@ -123,11 +167,24 @@ async def dashboard_node(state: DataAnalystDeptState) -> Dict[str, Any]:
     
     events = _emit({**state, "events": events}, "agent_done", "DashboardAgent", "Interactive report ready.")
     
+    # Construct the massive structured payload exactly like the friend's agent
+    structured_output = {
+        "analysis_plan": state.get("analysis_plan", {}),
+        "dataset_info": state.get("dataset_info", {}),
+        "eda_results": state.get("eda_results", {}),
+        "insights": state.get("insights", {}),
+        "review": state.get("review", {}),
+        "report": state.get("insights", {}).get("report", ""),
+        "visualizations": [],
+    }
+    
+    json_payload = json.dumps(structured_output, indent=2)
+
     dashboard_code = output.content
     final_report = f"""## 📊 Data Analyst Interactive Report
 
 ### 💡 Key Insights
-{state.get("insights", "")}
+{state.get("insights", {}).get("executive_summary", "")}
 
 ### 📈 Interactive Live Report
 ```html
@@ -136,10 +193,16 @@ async def dashboard_node(state: DataAnalystDeptState) -> Dict[str, Any]:
 
 > [!TIP]
 > **Live Preview:** Click the **👁️ Live Preview** tab at the top of this message (or **↗️ Fullscreen**) to view and interact with your report directly in the browser!
+
+### 🧱 Raw Structured Output
+```json
+{json_payload}
+```
 """
     
     return {
         "dashboard_code": dashboard_code,
+        "structured_output": structured_output,
         "final_report": final_report,
         "events": events,
     }
@@ -153,13 +216,15 @@ data_analyst_graph.add_node("data_planner_node", data_planner_node)
 data_analyst_graph.add_node("eda_node", eda_node)
 data_analyst_graph.add_node("execution_node", execution_node)
 data_analyst_graph.add_node("insights_node", insights_node)
+data_analyst_graph.add_node("review_node", review_node)
 data_analyst_graph.add_node("dashboard_node", dashboard_node)
 
 data_analyst_graph.add_edge(START, "data_planner_node")
 data_analyst_graph.add_edge("data_planner_node", "eda_node")
 data_analyst_graph.add_edge("eda_node", "execution_node")
 data_analyst_graph.add_edge("execution_node", "insights_node")
-data_analyst_graph.add_edge("insights_node", "dashboard_node")
+data_analyst_graph.add_edge("insights_node", "review_node")
+data_analyst_graph.add_edge("review_node", "dashboard_node")
 data_analyst_graph.add_edge("dashboard_node", END)
 
 data_analyst_subgraph = data_analyst_graph.compile()
