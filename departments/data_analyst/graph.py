@@ -39,7 +39,7 @@ async def data_planner_node(state: DataAnalystDeptState) -> Dict[str, Any]:
     planner = agents["planner"]
 
     events = _emit(state, "agent_working", "DataPlannerAgent", "Formulating analysis and visualization plan...")
-    output = await planner.execute(state["task"])
+    output = await planner.execute(state["task"], context={"user_id": state.get("user_id")})
 
     events = _emit({**state, "events": events}, "agent_done", "DataPlannerAgent", "Analysis plan ready.")
     
@@ -55,7 +55,11 @@ async def eda_node(state: DataAnalystDeptState) -> Dict[str, Any]:
 
     events = _emit(state, "agent_working", "EDAAgent", "Writing data processing scripts...")
     
-    output = await eda.execute(state["task"], context={"analysis_plan": state.get("analysis_plan")})
+    context = {
+        "analysis_plan": state.get("analysis_plan"),
+        "user_id": state.get("user_id")
+    }
+    output = await eda.execute(state["task"], context=context)
     
     events = _emit({**state, "events": events}, "agent_done", "EDAAgent", "EDA script generated.")
     
@@ -181,6 +185,7 @@ async def data_analyst_department_node(state) -> Dict[str, Any]:
     initial_state = {
         "task": da_task,
         "original_request": state["user_request"],
+        "user_id": state.get("user_id"),
         "api_keys": state.get("api_keys"),
         "selected_model": state.get("selected_model"),
         "events": [],

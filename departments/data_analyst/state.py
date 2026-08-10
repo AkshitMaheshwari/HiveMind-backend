@@ -9,6 +9,7 @@ class DataAnalystDeptState(TypedDict):
     # ── Input ──────────────────────────────────────────────────────
     task: str
     original_request: str
+    user_id: Optional[str]               # ID of the user (for accessing uploaded files)
     api_keys: Optional[Dict[str, str]]   # User-provided API keys
     selected_model: Optional[str]        # User's chosen model id
 

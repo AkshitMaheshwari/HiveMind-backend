@@ -44,9 +44,11 @@ Identify the key metrics (KPIs), the necessary charts/graphs, and any predictive
 Output structured JSON with key_metrics, visualizations, predictions_needed, and plan_rationale."""
 
     async def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
+        user_id = context.get("user_id", "") if context else ""
+        upload_note = f"\n\nNOTE: If the user uploaded a file, it is saved locally at 'data/uploads/{user_id}/'." if user_id else ""
         try:
             result: AnalysisPlan = await self._ainvoke_structured(
-                f"Formulate a data analysis and visualization plan for: {task}",
+                f"Formulate a data analysis and visualization plan for: {task}{upload_note}",
                 AnalysisPlan
             )
             content = (
@@ -80,7 +82,10 @@ Output structured JSON with language (python), code, explanation, and dependenci
 
     async def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
         plan = context.get("analysis_plan", "") if context else ""
-        prompt = f"Data Task: {task}\n\nAnalysis Plan to Follow:\n{plan}\n\nWrite Python code to process this data and print the summarized results."
+        user_id = context.get("user_id", "") if context else ""
+        upload_note = f"\n\nCRITICAL: The user has uploaded files. You MUST read the file from the local directory: 'data/uploads/{user_id}/' using pandas or other tools. DO NOT use mock data if an uploaded file is mentioned or available." if user_id else ""
+        
+        prompt = f"Data Task: {task}\n\nAnalysis Plan to Follow:\n{plan}{upload_note}\n\nWrite Python code to process this data and print the summarized results."
         try:
             result: GeneratedCode = await self._ainvoke_structured(prompt, GeneratedCode)
             return AgentOutput(
