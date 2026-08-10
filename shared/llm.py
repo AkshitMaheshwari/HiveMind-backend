@@ -65,6 +65,16 @@ class ResilientLLM:
                 last_err = e
         raise last_err or RuntimeError("All LLM models in resilient chain failed.")
 
+    async def ainvoke(self, messages, **kwargs):
+        last_err = None
+        for llm in self.llms:
+            try:
+                return await llm.ainvoke(messages, **kwargs)
+            except Exception as e:
+                logger.warning(f"LLM async invocation failed on model {getattr(llm, 'model', 'unknown')}: {e}. Retrying with next model...")
+                last_err = e
+        raise last_err or RuntimeError("All LLM models in resilient chain failed.")
+
     def with_structured_output(self, schema, **kwargs):
         structured_llms = []
         for l in self.llms:

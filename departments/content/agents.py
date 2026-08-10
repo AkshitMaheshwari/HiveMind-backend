@@ -54,7 +54,7 @@ Guidelines:
 
 Always output structured JSON with title, content, tone, and word_count."""
 
-    def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
+    async def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
         context = context or {}
         research = context.get("research_context", "")
 
@@ -65,7 +65,7 @@ Always output structured JSON with title, content, tone, and word_count."""
 Create engaging, well-structured content for this task."""
 
         try:
-            result: ContentDraft = self._invoke_structured(prompt, ContentDraft)
+            result: ContentDraft = await self._ainvoke_structured(prompt, ContentDraft)
             formatted = f"# {result.title}\n\n{result.content}"
             return AgentOutput(
                 agent_name=self.name,
@@ -81,7 +81,7 @@ Create engaging, well-structured content for this task."""
         except Exception as e:
             # Fallback to unstructured
             try:
-                fallback = self._invoke(prompt)
+                fallback = await self._ainvoke(prompt)
                 return AgentOutput(
                     agent_name=self.name,
                     department=self.department,
@@ -118,7 +118,7 @@ SEO optimization checklist:
 The content must read naturally — SEO is secondary to user value.
 Output structured JSON with keyword data and optimized content."""
 
-    def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
+    async def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
         context = context or {}
         draft = context.get("draft_content", "")
 
@@ -130,7 +130,7 @@ Draft content to optimize:
 Perform SEO optimization and return structured output."""
 
         try:
-            result: SEOEnhancements = self._invoke_structured(prompt, SEOEnhancements)
+            result: SEOEnhancements = await self._ainvoke_structured(prompt, SEOEnhancements)
             return AgentOutput(
                 agent_name=self.name,
                 department=self.department,
@@ -174,7 +174,7 @@ Editorial checklist:
 
 Output publication-ready content with a list of changes made and a quality score."""
 
-    def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
+    async def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
         context = context or {}
         content = context.get("seo_content", context.get("draft_content", ""))
 
@@ -186,7 +186,7 @@ Content for review and editing:
 Perform final editorial review and output polished content."""
 
         try:
-            result: EditedContent = self._invoke_structured(prompt, EditedContent)
+            result: EditedContent = await self._ainvoke_structured(prompt, EditedContent)
             return AgentOutput(
                 agent_name=self.name,
                 department=self.department,
@@ -200,7 +200,7 @@ Perform final editorial review and output polished content."""
         except Exception as e:
             # Fallback to unstructured editing
             try:
-                fallback = self._invoke(
+                fallback = await self._ainvoke(
                     f"Edit and polish this content:\n\n{content[:4000]}",
                     system_override="You are a senior editor. Fix grammar, improve flow, and return polished content."
                 )

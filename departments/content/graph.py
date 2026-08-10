@@ -36,13 +36,13 @@ def _emit(state: ContentDeptState, event: str, agent: str, data: str = "") -> li
 
 # ─── Graph Nodes ──────────────────────────────────────────────────────────────
 
-def copywriter_node(state: ContentDeptState) -> Dict[str, Any]:
+async def copywriter_node(state: ContentDeptState) -> Dict[str, Any]:
     """Copywriter Agent — creates the initial content draft."""
     copywriter, _, _ = _make_agents(state.get("api_keys"), state.get("selected_model"))
 
     events = _emit(state, "agent_working", "CopywriterAgent", "Writing content draft...")
 
-    output = copywriter.execute(
+    output = await copywriter.execute(
         state["task"],
         context={"research_context": state.get("research_context", "")},
     )
@@ -60,13 +60,13 @@ def copywriter_node(state: ContentDeptState) -> Dict[str, Any]:
     }
 
 
-def seo_optimizer_node(state: ContentDeptState) -> Dict[str, Any]:
+async def seo_optimizer_node(state: ContentDeptState) -> Dict[str, Any]:
     """SEO Optimizer Agent — keyword optimization."""
     _, seo_optimizer, _ = _make_agents(state.get("api_keys"), state.get("selected_model"))
 
     events = _emit(state, "agent_working", "SEOOptimizerAgent", "Optimizing for search engines...")
 
-    output = seo_optimizer.execute(
+    output = await seo_optimizer.execute(
         state["task"],
         context={"draft_content": state.get("draft_content", "")},
     )
@@ -86,13 +86,13 @@ def seo_optimizer_node(state: ContentDeptState) -> Dict[str, Any]:
     }
 
 
-def editor_node(state: ContentDeptState) -> Dict[str, Any]:
+async def editor_node(state: ContentDeptState) -> Dict[str, Any]:
     """Editor Agent — final polish and proofreading."""
     _, _, editor = _make_agents(state.get("api_keys"), state.get("selected_model"))
 
     events = _emit(state, "agent_working", "EditorAgent", "Editing and proofreading...")
 
-    output = editor.execute(
+    output = await editor.execute(
         state["task"],
         context={
             "seo_content": state.get("seo_optimized_content", ""),
@@ -132,7 +132,7 @@ content_subgraph = content_graph.compile()
 
 # ─── Outer node — plugs into root orchestrator graph ─────────────────────────
 
-def content_department_node(state) -> Dict[str, Any]:
+async def content_department_node(state) -> Dict[str, Any]:
     """Outer node that plugs into the main orchestrator graph."""
     # Find the content subtask
     subtasks = state.get("task_plan", {}).get("subtasks", [])
@@ -163,7 +163,7 @@ def content_department_node(state) -> Dict[str, Any]:
         "events": [],
     }
 
-    final_state = content_subgraph.invoke(initial_state)
+    final_state = await content_subgraph.ainvoke(initial_state)
 
     events.extend(final_state.get("events", []))
     events.append({

@@ -98,7 +98,7 @@ def emit_event(state: OrchestratorState, event: str, data: str = None, **kwargs)
     return events
 
 
-def ceo_router_node(state: OrchestratorState) -> Dict[str, Any]:
+async def ceo_router_node(state: OrchestratorState) -> Dict[str, Any]:
     """
     CEO node: analyzes request, produces task plan, routes to departments.
     """
@@ -124,7 +124,7 @@ def ceo_router_node(state: OrchestratorState) -> Dict[str, Any]:
 
         messages.append(HumanMessage(content=f"User request: {state['user_request']}"))
 
-        plan: TaskPlanOutput = structured_llm.invoke(messages)
+        plan: TaskPlanOutput = await structured_llm.ainvoke(messages)
 
         task_plan = {
             "departments": plan.departments,
@@ -200,7 +200,7 @@ def ceo_route_departments(state: OrchestratorState) -> List[str]:
         return [f"{d}_department_node" for d in departments]
 
 
-def clarification_node(state: OrchestratorState) -> Dict[str, Any]:
+async def clarification_node(state: OrchestratorState) -> Dict[str, Any]:
     """
     Emits a clarification request. In production this would use LangGraph interrupt().
     For now returns final_output with the question.

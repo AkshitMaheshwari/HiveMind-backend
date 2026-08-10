@@ -2,6 +2,7 @@
 Code Department LangGraph subgraph.
 Flow: code_generator_node → debugger_node → doc_writer_node → [done]
 """
+import asyncio
 from datetime import datetime
 from typing import Any, Dict
 
@@ -37,13 +38,13 @@ def _emit(state: CodeDeptState, event: str, agent: str, data: str = "") -> list:
 
 # ─── Graph Nodes ──────────────────────────────────────────────────────────────
 
-def code_generator_node(state: CodeDeptState) -> Dict[str, Any]:
+async def code_generator_node(state: CodeDeptState) -> Dict[str, Any]:
     """Code Generator — writes the initial code solution."""
     code_gen, _, _ = _make_agents(state.get("api_keys"), state.get("selected_model"))
 
     events = _emit(state, "agent_working", "CodeGeneratorAgent", "Generating code solution...")
 
-    output = code_gen.execute(state["task"])
+    output = await code_gen.execute(state["task"])
 
     events = _emit(
         {**state, "events": events},
@@ -61,7 +62,7 @@ def code_generator_node(state: CodeDeptState) -> Dict[str, Any]:
     }
 
 
-def debugger_node(state: CodeDeptState) -> Dict[str, Any]:
+async def debugger_node(state: CodeDeptState) -> Dict[str, Any]:
     """Debugger — runs code in sandbox (Python) or verifies web code (HTML/JS/CSS)."""
     _, debugger, _ = _make_agents(state.get("api_keys"), state.get("selected_model"))
 
@@ -78,7 +79,7 @@ def debugger_node(state: CodeDeptState) -> Dict[str, Any]:
             "stderr": "",
         }
     else:
-        exec_result = execute_code(code)
+        exec_result = await asyncio.to_thread(execute_code, code)
 
     events = _emit(
         {**state, "events": events},
@@ -95,7 +96,7 @@ def debugger_node(state: CodeDeptState) -> Dict[str, Any]:
             "DebuggerAgent",
             "Fixing errors...",
         )
-        debug_output = debugger.execute(
+        debug_output = await debugger.execute(
             state["task"],
             context={
                 "generated_code": code,
@@ -123,7 +124,7 @@ def debugger_node(state: CodeDeptState) -> Dict[str, Any]:
     }
 
 
-def doc_writer_node(state: CodeDeptState) -> Dict[str, Any]:
+async def doc_writer_node(state: CodeDeptState) -> Dict[str, Any]:
     """Doc Writer — generates documentation or formatted web deliverable."""
     _, _, doc_writer = _make_agents(state.get("api_keys"), state.get("selected_model"))
 
@@ -151,7 +152,7 @@ def doc_writer_node(state: CodeDeptState) -> Dict[str, Any]:
 
     # For Python or standard backend code, generate complete developer docs
     events = _emit(state, "agent_working", "DocWriterAgent", "Generating documentation...")
-    output = doc_writer.execute(
+    output = await doc_writer.execute(
         state["task"],
         context={
             "final_code": final_code_display,
@@ -217,7 +218,7 @@ code_subgraph = code_graph.compile()
 
 # ─── Outer node — plugs into root orchestrator graph ─────────────────────────
 
-def code_department_node(state) -> Dict[str, Any]:
+async def code_department_node(state) -> Dict[str, Any]:
     """Outer node that plugs into the main orchestrator graph."""
     subtasks = state.get("task_plan", {}).get("subtasks", [])
     code_task = state["user_request"]
@@ -243,7 +244,7 @@ def code_department_node(state) -> Dict[str, Any]:
         "events": [],
     }
 
-    final_state = code_subgraph.invoke(initial_state)
+    final_state = await code_subgraph.ainvoke(initial_state)
 
     events.extend(final_state.get("events", []))
     events.append({

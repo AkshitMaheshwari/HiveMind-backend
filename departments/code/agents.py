@@ -54,9 +54,9 @@ CRITICAL RULES:
 
 Output structured JSON with language, code, explanation, and dependencies."""
 
-    def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
+    async def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
         try:
-            result: GeneratedCode = self._invoke_structured(
+            result: GeneratedCode = await self._ainvoke_structured(
                 f"Coding task: {task}\n\nWrite complete, production-ready code for this task.",
                 GeneratedCode,
             )
@@ -74,7 +74,7 @@ Output structured JSON with language, code, explanation, and dependencies."""
         except Exception as e:
             # Unstructured fallback
             try:
-                response = self._invoke(
+                response = await self._ainvoke(
                     f"Write complete, runnable code for: {task}\n\nReturn ONLY the code, no explanation.",
                     system_override="You are an expert programmer. Return only clean, runnable code."
                 )
@@ -125,7 +125,7 @@ Your job is to:
 
 Output structured JSON with fixed_code, issues_found, is_resolved, and explanation."""
 
-    def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
+    async def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
         context = context or {}
         code = context.get("generated_code", "")
         stdout = context.get("stdout", "")
@@ -164,7 +164,7 @@ Execution succeeded: {success}
 Please debug the code, fix any issues, and return the corrected version."""
 
         try:
-            result: DebuggingResult = self._invoke_structured(prompt, DebuggingResult)
+            result: DebuggingResult = await self._ainvoke_structured(prompt, DebuggingResult)
             return AgentOutput(
                 agent_name=self.name,
                 department=self.department,
@@ -202,7 +202,7 @@ Your job is to create comprehensive documentation for code including:
 The documentation should be clear, accurate, and developer-friendly.
 Output structured JSON with readme, docstring, and usage_examples."""
 
-    def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
+    async def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
         context = context or {}
         code = context.get("final_code", context.get("generated_code", ""))
         language = context.get("language", "python")
@@ -220,7 +220,7 @@ Additional context: {explanation}
 Generate comprehensive documentation."""
 
         try:
-            result: Documentation = self._invoke_structured(prompt, Documentation)
+            result: Documentation = await self._ainvoke_structured(prompt, Documentation)
             doc_output = f"{result.readme}\n\n---\n\n## Module Docstring\n\n```\n{result.docstring}\n```"
             if result.usage_examples:
                 doc_output += "\n\n## Usage Examples\n\n"
@@ -236,7 +236,7 @@ Generate comprehensive documentation."""
         except Exception as e:
             # Fallback to simple doc
             try:
-                doc = self._invoke(
+                doc = await self._ainvoke(
                     f"Write a README.md for this code:\n```\n{code[:3000]}\n```",
                     system_override="You are a technical writer. Write clear Markdown documentation."
                 )

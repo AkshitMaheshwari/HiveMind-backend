@@ -146,7 +146,7 @@ orchestrator_graph = build_orchestrator_graph()
 compiled_graph = orchestrator_graph.compile()
 
 
-def run_orchestrator(user_request: str, conversation_id: str = "default") -> Dict[str, Any]:
+async def run_orchestrator(user_request: str, conversation_id: str = "default") -> Dict[str, Any]:
     """
     Convenience function to run the full orchestrator pipeline.
     Returns the final OrchestratorState.
@@ -165,4 +165,4 @@ def run_orchestrator(user_request: str, conversation_id: str = "default") -> Dic
         "error": None,
     }
 
-    return compiled_graph.invoke(initial_state)
+    return await compiled_graph.ainvoke(initial_state)

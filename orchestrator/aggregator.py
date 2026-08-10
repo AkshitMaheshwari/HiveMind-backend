@@ -24,7 +24,7 @@ Guidelines:
 """
 
 
-def aggregator_node(state: OrchestratorState) -> Dict[str, Any]:
+async def aggregator_node(state: OrchestratorState) -> Dict[str, Any]:
     """
     Combines all department_outputs into a single cohesive final response.
     """
@@ -65,7 +65,7 @@ def aggregator_node(state: OrchestratorState) -> Dict[str, Any]:
 
     try:
         llm = ceo_llm(state.get("api_keys"), selected_model=state.get("selected_model"))
-        response = llm.invoke([
+        response = await llm.ainvoke([
             SystemMessage(content=AGGREGATOR_PROMPT),
             HumanMessage(content=combined_context),
         ])

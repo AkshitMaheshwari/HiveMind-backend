@@ -68,31 +68,25 @@ async def run_task_async(
             logger.warning("Could not fetch conversation history: %s", hist_exc)
 
     try:
-        # Run in a thread pool to avoid blocking the event loop
-        loop = asyncio.get_event_loop()
-
-        def _run():
-            from orchestrator.graph import compiled_graph
-            initial_state = {
-                "user_request": user_request,
-                "conversation_id": conversation_id,
-                "user_id": user_id,
-                "chat_history": chat_history,
-                "api_keys": api_keys,
-                "selected_model": selected_model,
-                "task_plan": None,
-                "active_departments": [],
-                "completed_departments": [],
-                "department_outputs": {},
-                "agent_events": [],
-                "final_output": "",
-                "clarification_needed": False,
-                "clarification_question": None,
-                "error": None,
-            }
-            return compiled_graph.invoke(initial_state)
-
-        final_state = await loop.run_in_executor(None, _run)
+        from orchestrator.graph import compiled_graph
+        initial_state = {
+            "user_request": user_request,
+            "conversation_id": conversation_id,
+            "user_id": user_id,
+            "chat_history": chat_history,
+            "api_keys": api_keys,
+            "selected_model": selected_model,
+            "task_plan": None,
+            "active_departments": [],
+            "completed_departments": [],
+            "department_outputs": {},
+            "agent_events": [],
+            "final_output": "",
+            "clarification_needed": False,
+            "clarification_question": None,
+            "error": None,
+        }
+        final_state = await compiled_graph.ainvoke(initial_state)
 
         # Stream all events to connected WebSocket clients and save to DB
         events = final_state.get("agent_events", [])

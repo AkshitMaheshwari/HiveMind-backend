@@ -61,6 +61,14 @@ async def startup_event() -> None:
             "Qdrant initialisation failed — RAG features will be unavailable: %s", exc
         )
 
+    try:
+        from langchain.globals import set_llm_cache
+        from langchain.cache import InMemoryCache
+        set_llm_cache(InMemoryCache())
+        logger.info("LangChain InMemoryCache enabled successfully.")
+    except Exception as exc:
+        logger.warning("Failed to enable LangChain InMemoryCache: %s", exc)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

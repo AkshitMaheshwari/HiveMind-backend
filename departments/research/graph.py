@@ -46,12 +46,12 @@ def _emit(state: ResearchDeptState, event: str, agent: str, data: str = "") -> l
 
 # ─── Graph Nodes ──────────────────────────────────────────────────────────────
 
-def arxiv_node(state: ResearchDeptState) -> Dict[str, Any]:
+async def arxiv_node(state: ResearchDeptState) -> Dict[str, Any]:
     """Arxiv Research Agent — searches arXiv for scientific preprints and papers."""
     arxiv_agent, _, _, _, _, _ = _make_agents(state.get("api_keys"), state.get("selected_model"))
 
     events = _emit(state, "agent_working", "ArxivResearchAgent", "Searching arXiv scientific papers...")
-    output = arxiv_agent.execute(state["task"])
+    output = await arxiv_agent.execute(state["task"])
 
     events = _emit(
         {**state, "events": events},
@@ -66,12 +66,12 @@ def arxiv_node(state: ResearchDeptState) -> Dict[str, Any]:
     }
 
 
-def wikipedia_node(state: ResearchDeptState) -> Dict[str, Any]:
+async def wikipedia_node(state: ResearchDeptState) -> Dict[str, Any]:
     """Wikipedia Agent — searches Wikipedia for background domain context."""
     _, wikipedia_agent, _, _, _, _ = _make_agents(state.get("api_keys"), state.get("selected_model"))
 
     events = _emit(state, "agent_working", "WikipediaAgent", "Searching Wikipedia knowledge base...")
-    output = wikipedia_agent.execute(state["task"])
+    output = await wikipedia_agent.execute(state["task"])
 
     events = _emit(
         {**state, "events": events},
@@ -87,12 +87,12 @@ def wikipedia_node(state: ResearchDeptState) -> Dict[str, Any]:
 
 
 
-def web_search_node(state: ResearchDeptState) -> Dict[str, Any]:
+async def web_search_node(state: ResearchDeptState) -> Dict[str, Any]:
     """Web Search Agent — finds real-time web intelligence and documentation."""
     _, _, web_search_agent, _, _, _ = _make_agents(state.get("api_keys"), state.get("selected_model"))
 
     events = _emit(state, "agent_working", "WebSearchAgent", "Searching web and technical docs...")
-    output = web_search_agent.execute(state["task"])
+    output = await web_search_agent.execute(state["task"])
 
     events = _emit(
         {**state, "events": events},
@@ -116,13 +116,13 @@ def web_search_node(state: ResearchDeptState) -> Dict[str, Any]:
     }
 
 
-def fact_checker_node(state: ResearchDeptState) -> Dict[str, Any]:
+async def fact_checker_node(state: ResearchDeptState) -> Dict[str, Any]:
     """Fact Checker Agent — verifies draft and checks academic & web evidence."""
     _, _, _, _, fact_checker_agent, _ = _make_agents(state.get("api_keys"), state.get("selected_model"))
 
     events = _emit(state, "agent_working", "FactCheckerAgent", "Cross-verifying evidence & claims...")
 
-    output = fact_checker_agent.execute(
+    output = await fact_checker_agent.execute(
         state["task"],
         context={
             "draft_answer": state.get("draft_answer", ""),
@@ -144,7 +144,7 @@ def fact_checker_node(state: ResearchDeptState) -> Dict[str, Any]:
     }
 
 
-def synthesizer_node(state: ResearchDeptState) -> Dict[str, Any]:
+async def synthesizer_node(state: ResearchDeptState) -> Dict[str, Any]:
     """Summarizer Agent — synthesizes arXiv, Wikipedia, Documents, and Web evidence into a clear answer."""
     _, _, _, summarizer_agent, _, _ = _make_agents(state.get("api_keys"), state.get("selected_model"))
 
@@ -154,7 +154,7 @@ def synthesizer_node(state: ResearchDeptState) -> Dict[str, Any]:
     arxiv_text = "\n".join([f"• [{e.get('source')}]: {e.get('summary')}" for e in state.get("arxiv_evidence", [])])
     wiki_text = "\n".join([f"• [{e.get('source')}]: {e.get('summary')}" for e in state.get("wikipedia_evidence", [])])
 
-    output = summarizer_agent.execute(
+    output = await summarizer_agent.execute(
         state["task"],
         context={
             "arxiv_draft": arxiv_text,
@@ -178,12 +178,12 @@ def synthesizer_node(state: ResearchDeptState) -> Dict[str, Any]:
     }
 
 
-def research_router_node(state: ResearchDeptState) -> Dict[str, Any]:
+async def research_router_node(state: ResearchDeptState) -> Dict[str, Any]:
     """Router Agent — decides which sources to search based on the query."""
     _, _, _, _, _, router_agent = _make_agents(state.get("api_keys"), state.get("selected_model"))
 
     events = _emit(state, "agent_working", "ResearchRouterAgent", "Analyzing query to route to appropriate knowledge sources...")
-    output = router_agent.execute(state["task"])
+    output = await router_agent.execute(state["task"])
     
     sources = output.metadata.get("sources", ["web_search_node"])
     reasoning = output.metadata.get("reasoning", "")
@@ -243,7 +243,7 @@ research_subgraph = research_graph.compile()
 
 # ─── Outer node — plugs into root orchestrator graph ─────────────────────────
 
-def research_department_node(state: "OrchestratorState") -> Dict[str, Any]:
+async def research_department_node(state: "OrchestratorState") -> Dict[str, Any]:
     """
     Outer node that plugs into the main orchestrator graph.
     Extracts the research task from the CEO's plan, runs the subgraph,
@@ -279,7 +279,7 @@ def research_department_node(state: "OrchestratorState") -> Dict[str, Any]:
         "events": [],
     }
 
-    final_state = research_subgraph.invoke(initial_state)
+    final_state = await research_subgraph.ainvoke(initial_state)
 
     # Merge subgraph events into orchestrator events
     events.extend(final_state.get("events", []))

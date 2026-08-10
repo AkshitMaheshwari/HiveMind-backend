@@ -23,7 +23,7 @@ def _emit(state: DocumentDeptState, event: str, agent: str, data: str = "") -> l
     return events
 
 
-def document_qa_node(state: DocumentDeptState) -> Dict[str, Any]:
+async def document_qa_node(state: DocumentDeptState) -> Dict[str, Any]:
     """Single node that retrieves documents and answers directly."""
     qa_agent = DocumentQAAgent(
         api_keys=state.get("api_keys"), 
@@ -31,7 +31,7 @@ def document_qa_node(state: DocumentDeptState) -> Dict[str, Any]:
     )
 
     events = _emit(state, "agent_working", "DocumentQAAgent", "Retrieving documents and extracting answer...")
-    output = qa_agent.execute(state["task"], context={"user_id": state.get("user_id")})
+    output = await qa_agent.execute(state["task"], context={"user_id": state.get("user_id")})
 
     events = _emit(
         {**state, "events": events},
@@ -60,7 +60,7 @@ document_subgraph = document_graph.compile()
 
 # ─── Outer node — plugs into root orchestrator graph ─────────────────────────
 
-def document_department_node(state: "OrchestratorState") -> Dict[str, Any]:
+async def document_department_node(state: "OrchestratorState") -> Dict[str, Any]:
     """
     Outer node that plugs into the main orchestrator graph.
     """
@@ -91,7 +91,7 @@ def document_department_node(state: "OrchestratorState") -> Dict[str, Any]:
         "events": [],
     }
 
-    final_state = document_subgraph.invoke(initial_state)
+    final_state = await document_subgraph.ainvoke(initial_state)
 
     # Merge subgraph events into orchestrator events
     events.extend(final_state.get("events", []))

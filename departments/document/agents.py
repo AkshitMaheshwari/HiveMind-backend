@@ -2,6 +2,7 @@
 Document Department — Worker Agents
 - DocumentQAAgent: Retrieves document chunks and answers the user query directly.
 """
+import asyncio
 from typing import Any, Dict
 
 from shared.base_agent import ProductionAgent, AgentOutput
@@ -21,7 +22,7 @@ class DocumentQAAgent(ProductionAgent):
     - Cite the document source if applicable.
     """
 
-    def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
+    async def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
         user_id = context.get("user_id") if context else None
         if not user_id:
             return AgentOutput(
@@ -34,12 +35,12 @@ class DocumentQAAgent(ProductionAgent):
 
         try:
             # 1. Retrieve the document chunks
-            raw_rag, confidence = rag_document_search(query=task, user_id=user_id, top_k=5)
+            raw_rag, confidence = await asyncio.to_thread(rag_document_search, query=task, user_id=user_id, top_k=5)
 
             # 2. Answer the question using the retrieved chunks
             prompt = f"Question: {task}\n\nDocument Excerpts:\n{raw_rag}\n\nAnswer the question directly based only on the excerpts."
             
-            final_answer = self._invoke(prompt)
+            final_answer = await self._ainvoke(prompt)
 
             # If the LLM generates empty string, handle it gracefully
             if not final_answer or not str(final_answer).strip():
