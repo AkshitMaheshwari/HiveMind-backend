@@ -70,6 +70,7 @@ async def run_task_async(
     try:
         from orchestrator.graph import compiled_graph
         initial_state = {
+            "task_id": task_id,
             "user_request": user_request,
             "conversation_id": conversation_id,
             "user_id": user_id,
@@ -102,20 +103,6 @@ async def run_task_async(
         await manager.send_events(task_id, events)
 
         final_output = final_state.get("final_output", "Task completed.")
-
-        # Stream the final output token-by-token for a typewriter effect
-        words = final_output.split(" ")
-        chunk_size = 4  # send N words at a time
-        accumulated = ""
-        for i in range(0, len(words), chunk_size):
-            chunk = " ".join(words[i:i + chunk_size])
-            accumulated += ("" if i == 0 else " ") + chunk
-            await manager.broadcast(task_id, {
-                "event": "partial_output",
-                "data": accumulated,
-                "timestamp": datetime.utcnow().isoformat(),
-            })
-            await asyncio.sleep(0.02)  # ~50 chunks/second
 
         # Update DB task record
         await db_service.update_task(task_id, {

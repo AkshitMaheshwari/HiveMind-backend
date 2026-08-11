@@ -64,12 +64,27 @@ async def aggregator_node(state: OrchestratorState) -> Dict[str, Any]:
         combined_context += f"## {dept.upper()} DEPARTMENT OUTPUT:\n{output}\n\n---\n\n"
 
     try:
+        from api.websocket.stream import manager
+        
         llm = ceo_llm(state.get("api_keys"), selected_model=state.get("selected_model"))
-        response = await llm.ainvoke([
+        
+        accumulated = ""
+        task_id = state.get("task_id")
+        
+        async for chunk in llm.astream([
             SystemMessage(content=AGGREGATOR_PROMPT),
             HumanMessage(content=combined_context),
-        ])
-        final = response.content
+        ]):
+            if chunk.content:
+                accumulated += chunk.content
+                if task_id:
+                    await manager.broadcast(task_id, {
+                        "event": "partial_output",
+                        "data": accumulated,
+                        "timestamp": datetime.utcnow().isoformat(),
+                    })
+        
+        final = accumulated
     except Exception as e:
         # Fallback: just concatenate departments cleanly
         final = f"**Based on your question:** {state['user_request']}\n\n"

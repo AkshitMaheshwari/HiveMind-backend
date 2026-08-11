@@ -29,6 +29,7 @@ class OrchestratorState(TypedDict):
     All department subgraphs read from and write to this.
     """
     # ── Input ──────────────────────────────────────────────────────
+    task_id: str
     user_request: str
     conversation_id: str
     user_id: str
