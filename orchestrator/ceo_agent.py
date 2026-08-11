@@ -20,7 +20,7 @@ from orchestrator.state import OrchestratorState
 # ─── Pydantic schema for structured CEO output ────────────────────────────────
 
 class SubTask(BaseModel):
-    department: Literal["research", "content", "code", "document", "data_analyst"]
+    department: Literal["research", "content", "code", "document", "data_analyst", "financial"]
     task: str = Field(description="Specific task for this department")
     depends_on: Optional[str] = Field(
         None, description="Name of department this task depends on, or null"
@@ -28,7 +28,7 @@ class SubTask(BaseModel):
 
 
 class TaskPlanOutput(BaseModel):
-    departments: List[Literal["research", "content", "code", "document", "data_analyst"]] = Field(
+    departments: List[Literal["research", "content", "code", "document", "data_analyst", "financial"]] = Field(
         default_factory=list,
         description="List of departments needed, in execution order. Empty list if clarification_needed is True."
     )
@@ -46,7 +46,7 @@ class TaskPlanOutput(BaseModel):
     )
 
 
-CEO_SYSTEM_PROMPT = """You are the CEO of an AI company with five departments:
+CEO_SYSTEM_PROMPT = """You are the CEO of an AI company with six departments:
 
 🔬 RESEARCH DEPARTMENT
 - Web research, fact-finding, market analysis, summarization.
@@ -68,6 +68,11 @@ CEO_SYSTEM_PROMPT = """You are the CEO of an AI company with five departments:
 - Data processing, Exploratory Data Analysis (EDA), statistics, actionable insights, and building interactive dashboards (Power BI style).
 - Use when: user asks to analyze a dataset, create a dashboard, or extract insights from data.
 
+💰 FINANCIAL DEPARTMENT
+- Stock market data, fundamental analysis, technical analysis, news sentiment, portfolio management, and comparative analysis.
+- Use when: user asks for stock prices, investing advice, company financials, or portfolio diversification.
+
+
 Your job is to analyze the user's request and output a structured JSON task plan.
 
 CRITICAL RULES (ALWAYS follow these):
@@ -85,6 +90,7 @@ Examples:
 - "Research competitors and write a comparison" → departments=["research", "content"], sequence="sequential"
 - "Fix this Python bug" → departments=["code"], sequence="parallel"
 - "Analyze this sales dataset and create a dashboard" → departments=["data_analyst"], sequence="parallel"
+- "Is AAPL a good stock to buy right now?" → departments=["financial"], sequence="parallel"
 - "hello" → clarification_needed=True, sequence="sequential", departments=[]
 - "what is in my uploaded PDF" → departments=["document"], sequence="sequential"
 """

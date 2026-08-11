@@ -28,6 +28,7 @@ class DataAnalystDeptState(TypedDict):
 
     # ── Output ─────────────────────────────────────────────────────
     final_report: str             # Final markdown report with embedded dashboard/insights
+    charts_json: List[Dict[str, Any]] # Extracted charts for frontend UI
 
     # ── Events ─────────────────────────────────────────────────────
     events: List[Dict[str, Any]]

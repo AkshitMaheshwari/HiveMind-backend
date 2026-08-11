@@ -200,10 +200,15 @@ async def dashboard_node(state: DataAnalystDeptState) -> Dict[str, Any]:
 ```
 """
     
+    charts = output.metadata.get("charts_json", [])
+    if charts:
+        events = _emit({**state, "events": events}, "charts_json", "DashboardAgent", json.dumps(charts))
+
     return {
         "dashboard_code": dashboard_code,
         "structured_output": structured_output,
         "final_report": final_report,
+        "charts_json": charts,
         "events": events,
     }
 

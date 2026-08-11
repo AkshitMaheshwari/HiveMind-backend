@@ -36,6 +36,17 @@ class GeneratedCode(BaseModel):
     dependencies: List[str] = Field(description="Required packages/libraries")
 
 
+class DashboardCode(BaseModel):
+    language: str = Field(description="Programming language used")
+    code: str = Field(description="Complete, runnable code")
+    explanation: str = Field(description="Brief explanation of the approach")
+    dependencies: List[str] = Field(description="Required packages/libraries")
+    charts_json: List[Dict[str, Any]] = Field(
+        default=[],
+        description="A list of structured JSON objects for frontend Recharts rendering. Each object MUST have a 'title', a 'data' array of points (mapping dates/categories to numeric values), and a 'lines' array of keys to plot."
+    )
+
+
 class DataInsights(BaseModel):
     executive_summary: str
     key_findings: List[str]
@@ -189,7 +200,7 @@ Your job is to generate a fully self-contained HTML file that acts as a stunning
 - CRITICAL: Since you are writing HTML for a browser, you CANNOT read local files. You MUST hardcode the aggregated statistics and data points (provided in your prompt from the EDA output) directly into the JavaScript `Plotly.newPlot` data structures.
 - Do NOT just create a grid of charts. Intertwine the textual insights provided into the HTML seamlessly (e.g., a nice header, followed by a paragraph of insight, followed by the relevant chart).
 - The dashboard MUST look extremely premium and visually impressive.
-Output structured JSON with language (html), code, explanation, and dependencies."""
+Output structured JSON containing the HTML code as well as a `charts_json` payload for native frontend charting."""
 
     async def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
         plan = context.get("analysis_plan", "") if context else ""
@@ -205,10 +216,11 @@ Aggregated Data/Stats from Python:
 {eda_output[:10000]}
 
 Generate a stunning, single-file HTML/JS interactive report using Plotly.js and Tailwind CSS. 
-Embed the textual report and insights alongside interactive charts generated from the aggregated data!"""
+Embed the textual report and insights alongside interactive charts generated from the aggregated data!
+Also generate a 'charts_json' array so the native frontend can plot dynamic Recharts."""
         
         try:
-            result: GeneratedCode = await self._ainvoke_structured(prompt, GeneratedCode)
+            result: DashboardCode = await self._ainvoke_structured(prompt, DashboardCode)
             return AgentOutput(
                 agent_name=self.name, department=self.department, success=True,
                 content=result.code, metadata=result.model_dump()
