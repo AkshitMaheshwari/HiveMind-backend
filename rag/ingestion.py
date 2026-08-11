@@ -8,7 +8,6 @@ from typing import List
 from langchain_core.documents import Document as LangchainDocument
 from connectors.document import Document as AppDocument
 from rag.chunker import chunk_text
-from rag.config import CHUNK_SIZE, CHUNK_OVERLAP
 from rag.vector_store import get_vector_store, delete_user_document
 
 logger = logging.getLogger(__name__)
@@ -49,7 +48,7 @@ def ingest_documents(documents: List[AppDocument]) -> IngestionResult:
                 logger.warning("dedup delete failed: %s", del_exc)
 
             # 2. Chunking
-            chunks_text = chunk_text(doc.text, chunk_size=CHUNK_SIZE, overlap=CHUNK_OVERLAP)
+            chunks_text = chunk_text(doc.text)
             
             # 3. Create LangChain Documents
             lc_docs = []

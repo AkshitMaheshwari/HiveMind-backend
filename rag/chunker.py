@@ -1,18 +1,17 @@
 """
-RAG chunker — splits documents using LangChain's RecursiveCharacterTextSplitter.
+RAG chunker — splits documents using LangChain's SemanticChunker.
 """
 from typing import List
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_experimental.text_splitter import SemanticChunker
+from rag.embedder import get_embedder
 
 
-def chunk_text(text: str, chunk_size: int, overlap: int) -> List[str]:
+def chunk_text(text: str) -> List[str]:
     """
-    Split a large text string into smaller chunks with overlap using LangChain.
+    Split a large text string into semantically grouped chunks using LangChain.
 
     Parameters:
         text: The input text to chunk. Must be non-empty.
-        chunk_size: Maximum chunk length in characters.
-        overlap: Character overlap between consecutive chunks.
 
     Returns:
         A list of text chunks.
@@ -22,16 +21,16 @@ def chunk_text(text: str, chunk_size: int, overlap: int) -> List[str]:
     """
     if not text or not text.strip():
         raise ValueError("chunk_text: text must not be empty.")
-    if chunk_size <= 0:
-        raise ValueError("chunk_text: chunk_size must be positive.")
-    if overlap < 0 or overlap >= chunk_size:
-        raise ValueError("chunk_text: overlap must be >= 0 and < chunk_size.")
 
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=chunk_size,
-        chunk_overlap=overlap,
-    )
-    chunks = splitter.split_text(text)
+    # Get the embedding model to use for semantic chunking
+    embedder = get_embedder()
+    
+    # Initialize the semantic chunker
+    splitter = SemanticChunker(embedder)
+    
+    # SemanticChunker creates Document objects, we need to extract the text
+    docs = splitter.create_documents([text])
+    chunks = [doc.page_content for doc in docs]
     
     if not chunks:
         chunks = [text.strip()]
