@@ -46,7 +46,7 @@ def route_after_ceo(state: OrchestratorState) -> str:
     completed = set(state.get("completed_departments", []))
     subtasks = task_plan.get("subtasks", [])
 
-    if sequence == "sequential":
+    if sequence == "sequential" and subtasks:
         # Run the first uncompleted department whose dependency is met
         for st in subtasks:
             dept = st["department"]
@@ -59,7 +59,7 @@ def route_after_ceo(state: OrchestratorState) -> str:
         # All done
         return "aggregator_node"
     else:
-        # Parallel: route to first uncompleted
+        # Parallel OR no subtasks: route to first uncompleted active department
         for dept in active:
             if dept not in completed:
                 return f"{dept}_department_node"

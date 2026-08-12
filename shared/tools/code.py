@@ -9,8 +9,11 @@ from typing import Dict
 
 logger = logging.getLogger(__name__)
 
+# Backend root for resolving relative paths in generated code
+_BACKEND_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
-def execute_code_local(code: str, timeout: int = 30) -> Dict[str, object]:
+
+def execute_code_local(code: str, timeout: int = 90) -> Dict[str, object]:
     """
     Execute Python code in a local subprocess sandbox.
 
@@ -39,6 +42,7 @@ def execute_code_local(code: str, timeout: int = 30) -> Dict[str, object]:
             capture_output=True,
             text=True,
             timeout=timeout,
+            cwd=_BACKEND_ROOT,  # Ensure relative paths like data/uploads/{user_id}/ resolve
         )
         return {
             "stdout": result.stdout,

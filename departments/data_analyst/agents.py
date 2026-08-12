@@ -117,7 +117,29 @@ Output structured JSON with language (python), code, explanation, and dependenci
     async def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
         plan = context.get("analysis_plan", "") if context else ""
         user_id = context.get("user_id", "") if context else ""
-        upload_note = f"\n\nCRITICAL: The user has uploaded files. You MUST read the file from the local directory: 'data/uploads/{user_id}/' using pandas or other tools. DO NOT use mock data if an uploaded file is mentioned or available." if user_id else ""
+        
+        upload_note = ""
+        if user_id:
+            import os
+            from pathlib import Path
+            # Resolve backend root and find actual uploaded files
+            backend_root = Path(__file__).resolve().parents[2]  # backend/departments/data_analyst → backend/
+            upload_dir = backend_root / "data" / "uploads" / user_id
+            try:
+                files = [f.name for f in upload_dir.iterdir() if f.is_file()]
+            except Exception:
+                files = []
+            
+            if files:
+                file_list = ", ".join(files)
+                upload_note = (
+                    f"\n\nCRITICAL: The user has uploaded the following file(s) to 'data/uploads/{user_id}/': {file_list}\n"
+                    f"You MUST read the file using the EXACT filename listed above (case-sensitive).\n"
+                    f"Use pandas: pd.read_csv('data/uploads/{user_id}/{files[0]}') or adjust for the relevant file.\n"
+                    f"DO NOT use mock data. DO NOT guess or change the filename."
+                )
+            else:
+                upload_note = f"\n\nNOTE: The upload directory 'data/uploads/{user_id}/' exists but contains no files. Use mock/sample data for demonstration."
         
         prompt = f"Data Task: {task}\n\nAnalysis Plan to Follow:\n{plan}{upload_note}\n\nWrite Python code to process this data and print the summarized results."
         try:

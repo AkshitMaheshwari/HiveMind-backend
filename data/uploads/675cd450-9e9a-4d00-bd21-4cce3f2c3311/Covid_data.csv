@@ -1,0 +1,501 @@
+date,region,country,confirmed,deaths,recovered
+20.02.21,Puntarenas,Canada,1,0,0
+11.11.21,Gelderland,Netherlands,6,1,2
+17.09.21,Magdalena,United Kingdom,11,2,4
+03.05.21,Cajamarca,Canada,16,3,6
+05.01.22,West Papua,Nigeria,21,4,8
+13.05.21,Kirov Oblast,Australia,26,5,10
+09.07.20,North West,United States,31,6,12
+17.08.21,Northern Mindanao,Costa Rica,36,7,14
+01.01.22,Cagayan Valley,Singapore,41,8,16
+07.05.21,West-Vlaanderen,China,46,9,18
+01.08.21,Ulster,Singapore,51,10,20
+14.11.21,Languedoc-Roussillon,Austria,56,11,22
+15.08.21,Minnesota,Norway,61,12,24
+18.01.21,Gangwon,Australia,66,13,26
+11.11.20,Viken,Netherlands,71,14,28
+22.09.21,British Columbia,United States,76,15,30
+28.10.21,Yorkshire,Canada,81,16,32
+17.06.21,Nord-Pas-de-Calais,Belgium,86,17,34
+30.04.21,Northwest Territories,Norway,91,18,36
+19.04.21,Xīběi,Costa Rica,96,19,38
+09.05.20,Leinster,Nigeria,101,20,40
+14.12.21,Castilla - La Mancha,Italy,106,21,42
+27.12.20,Western Cape,China,111,22,44
+13.11.20,An Giang,China,116,23,46
+05.11.20,Orenburg Oblast,Russian Federation,121,24,48
+28.04.21,Innlandet,Colombia,126,25,50
+18.12.21,Córdoba,Austria,131,26,52
+20.06.20,Gorontalo,Australia,136,27,54
+03.02.21,Oslo,Austria,141,28,56
+29.01.21,Leinster,Vietnam,146,29,58
+07.06.21,Jönköpings län,India,151,30,60
+16.02.21,Kherson oblast,Australia,156,31,62
+26.12.20,Munster,Spain,161,32,64
+07.01.21,Delta,Vietnam,166,33,66
+17.11.21,Los Ríos,Austria,171,34,68
+05.09.21,North Gyeongsang,Turkey,176,35,70
+17.06.21,Berlin,Germany,181,36,72
+30.10.20,Friesland,Indonesia,186,37,74
+24.02.21,Veracruz,Vietnam,191,38,76
+26.07.20,Haryana,Sweden,196,39,78
+25.02.21,Western Australia,Philippines,201,40,80
+17.04.21,Zachodniopomorskie,Costa Rica,206,41,82
+15.07.21,Xīběi,Spain,211,42,84
+18.05.21,Piura,Vietnam,216,43,86
+09.06.20,Bangsamoro,Norway,221,44,88
+02.10.21,Warmińsko-mazurskie,South Africa,226,45,90
+09.01.21,KwaZulu-Natal,China,231,46,92
+26.10.21,Burgenland,Costa Rica,236,47,94
+09.07.20,Yucatán,Turkey,241,48,96
+31.01.21,San José,South Korea,246,49,98
+05.05.21,Aisén,Belgium,251,50,100
+30.04.21,Minas Gerais,South Africa,256,51,102
+10.03.21,Zhytomyr oblast,Norway,261,52,104
+23.07.21,Madrid,Austria,266,53,106
+25.02.21,Davao Region,Germany,271,54,108
+29.07.21,Norte de Santander,South Korea,276,55,110
+14.09.20,Free State,Netherlands,281,56,112
+02.11.21,New Brunswick,Indonesia,286,57,114
+25.08.21,Northwest Territories,China,291,58,116
+11.06.21,Cauca,United States,296,59,118
+05.03.21,Khyber Pakhtoonkhwa,Netherlands,301,60,120
+26.03.21,Guaviare,India,306,61,122
+16.08.21,North Island,Australia,311,62,124
+08.05.20,Derbyshire,Austria,316,63,126
+30.08.20,San José,Peru,321,64,128
+10.12.20,Jönköpings län,France,326,65,130
+18.11.20,Dadra and Nagar Haveli,United States,331,66,132
+08.12.20,Magallanes y Antártica Chilena,Turkey,336,67,134
+05.02.21,Baja California,Italy,341,68,136
+02.08.21,Manitoba,Spain,346,69,138
+01.01.21,Dōngběi,Austria,351,70,140
+08.12.21,Kerala,United States,356,71,142
+01.09.21,Agder,Netherlands,361,72,144
+01.08.20,Baja California,India,366,73,146
+29.01.21,Corse,Singapore,371,74,148
+10.08.20,Lambayeque,Indonesia,376,75,150
+14.08.20,Caithness,Australia,381,76,152
+03.12.20,Swiętokrzyskie,Philippines,386,77,154
+14.01.22,Stockholms län,United Kingdom,391,78,156
+27.09.20,Vlaams-Brabant,United States,396,79,158
+20.08.21,Veneto,Sweden,401,80,160
+13.12.20,Punjab,Chile,406,81,162
+23.01.22,Veneto,Nigeria,411,82,164
+02.09.20,Arica y Parinacota,Canada,416,83,166
+21.12.21,Aydın,Italy,421,84,168
+25.05.20,Rheinland-Pfalz,United Kingdom,426,85,170
+23.02.21,South Island,Philippines,431,86,172
+22.06.20,San José,Indonesia,436,87,174
+02.10.20,Styria,Philippines,441,88,176
+08.04.21,Adana,Russian Federation,446,89,178
+16.02.22,New Brunswick,Peru,451,90,180
+14.01.21,Northern Territory,Costa Rica,456,91,182
+11.01.21,Arica y Parinacota,New Zealand,461,92,184
+29.11.20,Puntarenas,New Zealand,466,93,186
+15.01.22,North Region,Chile,471,94,188
+14.12.21,Auvergne,South Africa,476,95,190
+22.07.20,Puglia,Indonesia,481,96,192
+12.06.20,Nottinghamshire,Italy,486,97,194
+30.07.21,Kogi,Singapore,491,98,196
+31.08.20,North West,New Zealand,496,99,198
+09.08.20,North Island,Poland,501,100,200
+28.09.20,Nordland,Peru,506,101,202
+20.05.21,Auvergne,United States,511,102,204
+25.07.20,Lakshadweep,Brazil,516,103,206
+29.11.21,Ulster,Spain,521,104,208
+04.04.21,Maine,Norway,526,105,210
+11.10.21,Querétaro,South Africa,531,106,212
+29.11.21,Cajamarca,New Zealand,536,107,214
+04.12.20,Bà Rịa–Vũng Tàu,Peru,541,108,216
+08.05.21,North Island,India,546,109,218
+13.02.21,Chihuahua,Italy,551,110,220
+15.07.20,Gelderland,Ireland,556,111,222
+12.04.20,Cagayan Valley,Singapore,561,112,224
+02.08.20,Sindh,Poland,566,113,226
+22.11.20,Northern Cape,Russian Federation,571,114,228
+18.01.21,Guanacaste,Austria,576,115,230
+28.08.20,West Region,Indonesia,581,116,232
+03.09.20,Luik,Russian Federation,586,117,234
+18.04.21,Lorraine,Austria,591,118,236
+01.05.21,Kon Tum,Chile,596,119,238
+15.01.21,Nuevo León,Ireland,601,120,240
+30.06.21,West Kalimantan,Indonesia,606,121,242
+19.02.22,Connacht,Brazil,611,122,244
+23.10.21,Đồng Nai,Austria,616,123,246
+14.12.21,Lanarkshire,India,621,124,248
+10.04.20,Zeeland,France,626,125,250
+06.07.20,Liguria,Canada,631,126,252
+10.03.22,Vestland,Russian Federation,636,127,254
+18.01.22,Gelderland,Turkey,641,128,256
+03.05.20,East Region,Poland,646,129,258
+28.06.20,Pomorskie,Russian Federation,651,130,260
+10.10.21,Sachsen,Indonesia,656,131,262
+10.12.21,West Bengal,Vietnam,661,132,264
+21.03.21,Luik,Netherlands,666,133,266
+26.06.21,Munster,Sweden,671,134,268
+15.05.20,North Region,Poland,676,135,270
+18.02.22,Zuid Holland,Norway,681,136,272
+16.05.21,Stockholms län,Poland,686,137,274
+06.11.21,Alsace,Indonesia,691,138,276
+07.03.21,South Jeolla,Belgium,696,139,278
+03.12.20,Molise,Spain,701,140,280
+10.11.20,Zhōngnán,Vietnam,706,141,282
+09.10.20,North Gyeongsang,Belgium,711,142,284
+12.04.21,Drenthe,New Zealand,716,143,286
+18.11.21,Mizoram,Mexico,721,144,288
+24.02.21,Burgenland,Chile,726,145,290
+23.10.20,South Jeolla,Philippines,731,146,292
+24.03.21,Puntarenas,Mexico,736,147,294
+15.03.21,Eastern Cape,Canada,741,148,296
+16.08.20,Heredia,Australia,746,149,298
+15.06.21,Lambayeque,Turkey,751,150,300
+27.11.21,Louisiana,Norway,756,151,302
+02.02.21,Montana,Pakistan,761,152,304
+13.07.20,Noord Holland,Russian Federation,766,153,306
+18.10.21,Meghalaya,Sweden,771,154,308
+14.03.21,Jeju,Canada,776,155,310
+04.10.20,Imo,Norway,781,156,312
+14.06.21,Lombardia,France,786,157,314
+12.12.21,South Island,Nigeria,791,158,316
+25.11.20,Lower Austria,Ireland,796,159,318
+01.11.21,Sutherland,Singapore,801,160,320
+30.05.21,Abruzzo,India,806,161,322
+17.01.21,Arizona,Colombia,811,162,324
+13.03.21,Rio de Janeiro,Russian Federation,816,163,326
+14.05.20,Oklahoma,Austria,821,164,328
+05.04.20,Mersin,Nigeria,826,165,330
+27.08.20,Massachusetts,Poland,831,166,332
+30.03.20,North Island,New Zealand,836,167,334
+27.07.21,Putumayo,Chile,841,168,336
+19.09.21,Nordland,Nigeria,846,169,338
+11.01.22,North Chungcheong,Brazil,851,170,340
+06.04.20,Goa,India,856,171,342
+07.03.22,Hidalgo,Colombia,861,172,344
+09.01.21,Bahia,Russian Federation,866,173,346
+30.11.21,Zuid Holland,South Africa,871,174,348
+12.05.21,Special Region of Yogyakarta,Colombia,876,175,350
+07.06.20,Missouri,Austria,881,176,352
+23.02.22,Vienna,Vietnam,886,177,354
+02.01.22,Queensland,Colombia,891,178,356
+07.12.21,São Paulo,Nigeria,896,179,358
+27.12.20,Arequipa,South Korea,901,180,360
+17.11.20,Basse-Normandie,South Africa,906,181,362
+21.07.21,West Region,United States,911,182,364
+13.11.21,Lubuskie,Norway,916,183,366
+13.10.21,Junín,Canada,921,184,368
+14.08.20,Kiên Giang,China,926,185,370
+14.08.21,Calabarzon,Netherlands,931,186,372
+12.09.21,Paraíba,New Zealand,936,187,374
+30.01.21,Azad Kashmir,Ireland,941,188,376
+07.06.20,Manisa,Poland,946,189,378
+04.07.20,Gangwon,Chile,951,190,380
+11.07.20,Rheinland-Pfalz,Peru,956,191,382
+30.10.21,Bà Rịa–Vũng Tàu,Mexico,961,192,384
+15.09.20,Innlandet,Peru,966,193,386
+22.06.21,Mersin,Germany,971,194,388
+06.11.20,Punjab,Singapore,976,195,390
+29.01.22,Stirlingshire,Brazil,981,196,392
+12.07.20,Punjab,Canada,986,197,394
+24.09.21,East Region,Italy,991,198,396
+11.11.20,Central Region,Peru,996,199,398
+07.07.20,Provence-Alpes-Côte d'Azur,France,1001,200,400
+18.07.21,Luhansk oblast,Canada,1006,201,402
+20.04.21,Michoacán,South Korea,1011,202,404
+21.08.21,Maule,China,1016,203,406
+10.02.22,North Maluku,Mexico,1021,204,408
+11.03.22,Antwerpen,Nigeria,1026,205,410
+05.05.20,Puntarenas,Pakistan,1031,206,412
+22.02.21,Khyber Pakhtoonkhwa,Germany,1036,207,414
+17.10.20,San José,India,1041,208,416
+04.11.21,New South Wales,South Korea,1046,209,418
+30.11.20,Tuyên Quang,Canada,1051,210,420
+05.02.22,Gaziantep,Singapore,1056,211,422
+09.03.21,Connecticut,Russian Federation,1061,212,424
+21.03.21,Cumberland,Poland,1066,213,426
+07.04.20,Loreto,Poland,1071,214,428
+04.10.21,Paraná,Chile,1076,215,430
+22.01.21,Liguria,Turkey,1081,216,432
+12.05.20,Tamil Nadu,Canada,1086,217,434
+11.09.20,Navarra,Ireland,1091,218,436
+24.10.21,Special Region of Yogyakarta,Italy,1096,219,438
+21.07.20,Namen,Germany,1101,220,440
+12.05.20,South Island,Chile,1106,221,442
+10.11.21,Soccsksargen,Vietnam,1111,222,444
+21.02.22,South Chungcheong,Russian Federation,1116,223,446
+01.12.20,Tasmania,United Kingdom,1121,224,448
+16.01.21,O'Higgins,Mexico,1126,225,450
+09.07.20,Northern Mindanao,China,1131,226,452
+29.12.20,Wielkopolskie,United Kingdom,1136,227,454
+03.03.21,Molise,Costa Rica,1141,228,456
+11.04.20,Ulster,United Kingdom,1146,229,458
+13.07.20,South Island,France,1151,230,460
+17.07.21,North-East Region,Austria,1156,231,462
+27.10.21,Tabasco,Peru,1161,232,464
+21.12.20,West Bengal,Ireland,1166,233,466
+22.07.21,Zuid Holland,Colombia,1171,234,468
+09.10.21,Limpopo,United Kingdom,1176,235,470
+21.08.21,Paraíba,Italy,1181,236,472
+21.02.21,Oslo,South Korea,1186,237,474
+28.08.21,Chandigarh,South Africa,1191,238,476
+23.11.20,Chihuahua,Austria,1196,239,478
+27.04.21,Điện Biên,United Kingdom,1201,240,480
+18.06.20,Buteshire,Turkey,1206,241,482
+19.10.21,Manitoba,Germany,1211,242,484
+07.08.21,Liguria,Costa Rica,1216,243,486
+29.08.21,Oost-Vlaanderen,New Zealand,1221,244,488
+02.10.21,Central Visayas,Turkey,1226,245,490
+28.10.21,North-East Region,United Kingdom,1231,246,492
+25.11.20,Lubelskie,New Zealand,1236,247,494
+12.01.22,Australian Capital Territory,Norway,1241,248,496
+16.10.20,East Kalimantan,Sweden,1246,249,498
+30.05.20,Innlandet,China,1251,250,500
+08.06.20,Hidalgo,Pakistan,1256,251,502
+03.01.21,North Chungcheong,Pakistan,1261,252,504
+04.08.20,Magdalena,Canada,1266,253,506
+08.06.21,Delhi,Colombia,1271,254,508
+16.07.21,Agder,Vietnam,1276,255,510
+29.07.20,Ancash,Belgium,1281,256,512
+19.03.22,Paraíba,Costa Rica,1286,257,514
+11.03.22,Lima,France,1291,258,516
+31.05.20,Innlandet,South Africa,1296,259,518
+14.05.20,North Island,Ireland,1301,260,520
+16.05.21,Chiapas,United States,1306,261,522
+23.05.20,Ankara,Costa Rica,1311,262,524
+28.03.21,Nevada,South Africa,1316,263,526
+24.09.21,Warmińsko-mazurskie,Indonesia,1321,264,528
+30.03.20,Poitou-Charentes,Costa Rica,1326,265,530
+25.06.20,Liguria,Vietnam,1331,266,532
+03.12.20,Munster,Ireland,1336,267,534
+29.01.22,Munster,Chile,1341,268,536
+17.10.21,South Chungcheong,Peru,1346,269,538
+05.01.22,Jigawa,Austria,1351,270,540
+19.02.21,Victoria,India,1356,271,542
+24.08.21,Paraná,South Africa,1361,272,544
+06.05.21,National Capital Region,United Kingdom,1366,273,546
+17.02.22,Xīběi,Philippines,1371,274,548
+14.05.21,Warmińsko-mazurskie,Vietnam,1376,275,550
+03.09.21,Agder,Pakistan,1381,276,552
+13.02.22,Riau,Singapore,1386,277,554
+17.08.21,Trøndelag,Russian Federation,1391,278,556
+04.01.21,Bạc Liêu,United States,1396,279,558
+26.11.20,Saarland,Ireland,1401,280,560
+24.10.20,Alaska,Mexico,1406,281,562
+16.09.20,Ogun,Sweden,1411,282,564
+24.10.21,North Chungcheong,Sweden,1416,283,566
+13.01.22,West Region,Germany,1421,284,568
+27.11.21,Noord Brabant,Canada,1426,285,570
+03.12.20,Utah,South Africa,1431,286,572
+09.01.22,Azad Kashmir,South Africa,1436,287,574
+25.01.21,Renfrewshire,Ukraine,1441,288,576
+11.11.20,Sinaloa,Turkey,1446,289,578
+14.05.21,Västra Götalands län,Spain,1451,290,580
+26.09.20,Central Region,Vietnam,1456,291,582
+14.02.21,KwaZulu-Natal,South Korea,1461,292,584
+05.09.20,Hatay,Singapore,1466,293,586
+10.05.21,Troms og Finnmark,Philippines,1471,294,588
+29.01.21,Alabama,Vietnam,1476,295,590
+22.05.21,Gangwon,Norway,1481,296,592
+30.03.21,South Australia,Sweden,1486,297,594
+08.01.22,Innlandet,Costa Rica,1491,298,596
+31.07.20,Nebraska,Russian Federation,1496,299,598
+09.08.21,Castilla y León,Nigeria,1501,300,600
+15.04.21,Madrid,Austria,1506,301,602
+01.06.20,Munster,Ireland,1511,302,604
+24.03.21,Leinster,China,1516,303,606
+21.04.21,Östergötlands län,India,1521,304,608
+06.07.20,Connacht,Russian Federation,1526,305,610
+24.07.21,Nordland,United States,1531,306,612
+19.04.21,Kemerovo Oblast,France,1536,307,614
+22.10.20,Molise,Austria,1541,308,616
+30.07.21,North Chungcheong,France,1546,309,618
+07.05.21,Overijssel,Netherlands,1551,310,620
+23.11.20,Connecticut,Spain,1556,311,622
+06.01.21,Maranhão,Vietnam,1561,312,624
+17.10.21,Querétaro,Germany,1566,313,626
+09.07.20,Troms og Finnmark,Austria,1571,314,628
+03.06.20,Carinthia,Sweden,1576,315,630
+08.11.21,Free State,Norway,1581,316,632
+26.05.21,South Island,Ukraine,1586,317,634
+03.04.21,Soccsksargen,Chile,1591,318,636
+12.09.20,Carinthia,South Africa,1596,319,638
+11.12.21,Styria,Ukraine,1601,320,640
+07.05.20,Quindío,Mexico,1606,321,642
+01.08.20,Distrito Capital,South Korea,1611,322,644
+16.11.21,Niger,Poland,1616,323,646
+14.10.21,Minnesota,Costa Rica,1621,324,648
+28.05.20,Ryazan Oblast,Italy,1626,325,650
+17.10.21,Luhansk oblast,Germany,1631,326,652
+12.02.21,Mecklenburg-Vorpommern,Ukraine,1636,327,654
+05.02.21,Nuevo León,New Zealand,1641,328,656
+28.04.21,Luik,China,1646,329,658
+08.12.20,Bangsamoro,Turkey,1651,330,660
+15.08.20,North Island,Pakistan,1656,331,662
+19.03.22,Cần Thơ,Chile,1661,332,664
+26.03.20,North Gyeongsang,Italy,1666,333,666
+17.04.20,Bourgogne,Russian Federation,1671,334,668
+20.11.21,Cajamarca,Norway,1676,335,670
+12.05.21,San José,Belgium,1681,336,672
+26.12.21,Veracruz,Belgium,1686,337,674
+27.04.20,West Region,France,1691,338,676
+20.05.21,Kayseri,United States,1696,339,678
+15.05.20,Donetsk oblast,Mexico,1701,340,680
+17.07.20,Kerala,Ukraine,1706,341,682
+04.08.21,North Island,Pakistan,1711,342,684
+27.12.20,Rio Grande do Sul,Chile,1716,343,686
+16.03.21,Khyber Pakhtoonkhwa,Colombia,1721,344,688
+07.10.20,South Sulawesi,South Africa,1726,345,690
+06.09.20,Nova Scotia,Brazil,1731,346,692
+27.08.21,Huáběi,Mexico,1736,347,694
+12.10.20,Kostroma Oblast,Italy,1741,348,696
+28.11.21,Central Luzon,Ireland,1746,349,698
+01.04.21,Khyber Pakhtoonkhwa,Germany,1751,350,700
+14.11.21,Cesar,Netherlands,1756,351,702
+15.10.20,Rio de Janeiro,Vietnam,1761,352,704
+19.02.21,Aquitaine,Nigeria,1766,353,706
+05.03.21,Central Luzon,Belgium,1771,354,708
+10.01.22,Antwerpen,Italy,1776,355,710
+21.02.22,Meta,Canada,1781,356,712
+27.11.21,Henegouwen,Spain,1786,357,714
+21.05.20,Tamaulipas,Italy,1791,358,716
+13.09.21,Northern Territory,Sweden,1796,359,718
+10.10.20,Principado de Asturias,Canada,1801,360,720
+13.03.21,Östergötlands län,Vietnam,1806,361,722
+09.09.20,Nottinghamshire,Netherlands,1811,362,724
+07.02.21,Kahramanmaraş,Singapore,1816,363,726
+01.10.21,Hamburg,India,1821,364,728
+14.08.20,Styria,Turkey,1826,365,730
+25.02.22,Styria,France,1831,366,732
+03.03.22,West Region,Germany,1836,367,734
+09.12.20,Australian Capital Territory,Indonesia,1841,368,736
+08.09.20,Connacht,Ukraine,1846,369,738
+11.03.21,Cà Mau,India,1851,370,740
+03.04.21,Santander,Austria,1856,371,742
+19.01.22,Queensland,Costa Rica,1861,372,744
+31.03.20,Michigan,Colombia,1866,373,746
+20.09.20,Agder,New Zealand,1871,374,748
+03.05.21,Aydın,Peru,1876,375,750
+22.02.22,Goa,Ireland,1881,376,752
+27.01.22,South Jeolla,Colombia,1886,377,754
+31.08.20,Bauchi,Ukraine,1891,378,756
+12.07.21,Antofagasta,Canada,1896,379,758
+19.07.20,Noord Brabant,Colombia,1901,380,760
+21.05.20,Pará,Turkey,1906,381,762
+07.10.20,Emilia-Romagna,Norway,1911,382,764
+16.06.20,Kaliningrad Oblast,United Kingdom,1916,383,766
+05.12.21,Basse-Normandie,Singapore,1921,384,768
+05.04.20,North Island,South Africa,1926,385,770
+23.06.20,South Island,South Korea,1931,386,772
+16.07.20,Melilla,Italy,1936,387,774
+18.09.20,Eastern Cape,Singapore,1941,388,776
+28.06.21,Bretagne,United States,1946,389,778
+26.09.21,Warwickshire,Norway,1951,390,780
+03.09.20,Kano,South Africa,1956,391,782
+24.08.20,Antioquia,Turkey,1961,392,784
+18.04.21,Eastern Cape,Mexico,1966,393,786
+10.11.21,Northern Territory,Costa Rica,1971,394,788
+02.06.21,Guaviare,Ukraine,1976,395,790
+11.05.20,Cartago,India,1981,396,792
+03.07.21,Samara Oblast,Canada,1986,397,794
+14.12.21,Noord Brabant,United Kingdom,1991,398,796
+01.12.21,Östergötlands län,Nigeria,1996,399,798
+07.01.22,Balochistan,Brazil,2001,400,800
+13.07.20,Calabria,France,2006,401,802
+14.02.22,Jönköpings län,Sweden,2011,402,804
+25.06.21,Vaupés,Germany,2016,403,806
+09.02.22,Limburg,Vietnam,2021,404,808
+22.08.20,South Chungcheong,Ireland,2026,405,810
+08.10.21,Västra Götalands län,Germany,2031,406,812
+11.09.20,Dalarnas län,Sweden,2036,407,814
+26.11.20,Gorontalo,Ukraine,2041,408,816
+18.05.20,Sindh,Sweden,2046,409,818
+02.01.21,Niger,United Kingdom,2051,410,820
+28.07.21,Kayseri,Ireland,2056,411,822
+17.10.21,National Capital Region,China,2061,412,824
+07.06.21,Mexico City,Australia,2066,413,826
+10.04.21,Alsace,South Korea,2071,414,828
+18.03.22,Dōngběi,France,2076,415,830
+08.02.21,Queensland,Turkey,2081,416,832
+28.10.20,North Sumatra,Norway,2086,417,834
+23.06.20,Piemonte,India,2091,418,836
+26.09.20,Valparaíso,Singapore,2096,419,838
+04.09.20,Pernambuco,South Korea,2101,420,840
+12.07.21,FATA,Vietnam,2106,421,842
+04.06.20,North Island,Norway,2111,422,844
+06.04.20,Western Cape,Singapore,2116,423,846
+25.08.21,Gujarat,Vietnam,2121,424,848
+29.08.20,Puglia,Belgium,2126,425,850
+11.09.21,Leinster,India,2131,426,852
+05.03.21,Nord-Pas-de-Calais,Netherlands,2136,427,854
+13.12.21,Western Cape,Austria,2141,428,856
+08.01.22,Buckinghamshire,Brazil,2146,429,858
+26.08.21,Loreto,Pakistan,2151,430,860
+23.09.21,Prince Edward Island,Spain,2156,431,862
+28.07.21,Lower Austria,Chile,2161,432,864
+22.09.20,Niedersachsen,United States,2166,433,866
+29.08.21,Mecklenburg-Vorpommern,New Zealand,2171,434,868
+04.05.20,North Gyeongsang,Norway,2176,435,870
+24.12.21,Toscana,China,2181,436,872
+24.05.20,Cajamarca,Brazil,2186,437,874
+03.07.20,North Region,Ukraine,2191,438,876
+09.04.20,Västra Götalands län,Netherlands,2196,439,878
+03.12.20,Gilgit Baltistan,Peru,2201,440,880
+02.08.21,Azad Kashmir,New Zealand,2206,441,882
+28.01.22,Pennsylvania,Pakistan,2211,442,884
+26.04.21,Cajamarca,Turkey,2216,443,886
+29.03.21,Chelyabinsk Oblast,Brazil,2221,444,888
+16.03.21,Central Region,Ireland,2226,445,890
+21.07.20,Yorkshire,Sweden,2231,446,892
+21.06.21,Huádōng,Costa Rica,2236,447,894
+14.03.22,Brussels Hoofdstedelijk Gewest,Ukraine,2241,448,896
+24.07.21,Rheinland-Pfalz,Austria,2246,449,898
+09.11.20,Lambayeque,Netherlands,2251,450,900
+30.12.21,Mpumalanga,South Korea,2256,451,902
+13.02.21,Yukon,France,2261,452,904
+06.03.21,Oryol Oblast,Canada,2266,453,906
+23.03.21,Bretagne,Italy,2271,454,908
+16.07.20,Gangwon,Ireland,2276,455,910
+17.07.20,Oost-Vlaanderen,United Kingdom,2281,456,912
+03.03.22,Nunavut,India,2286,457,914
+28.10.20,Mpumalanga,Belgium,2291,458,916
+09.08.20,Aisén,Norway,2296,459,918
+23.06.21,Flevoland,Singapore,2301,460,920
+30.05.21,Bangsamoro,Austria,2306,461,922
+29.12.20,Hatay,Belgium,2311,462,924
+07.12.21,łódzkie,New Zealand,2316,463,926
+13.11.21,Arizona,Nigeria,2321,464,928
+01.03.21,Rutland,Germany,2326,465,930
+23.12.21,North Island,Ukraine,2331,466,932
+27.05.20,Louisiana,Sweden,2336,467,934
+24.06.20,łódzkie,Pakistan,2341,468,936
+07.01.22,Oryol Oblast,Canada,2346,469,938
+10.12.21,Tasmania,Belgium,2351,470,940
+15.04.21,Dōngběi,Pakistan,2356,471,942
+08.04.21,Cao Bằng,Belgium,2361,472,944
+12.01.21,Manitoba,Poland,2366,473,946
+29.06.20,Donetsk oblast,Vietnam,2371,474,948
+05.01.21,Sinaloa,South Korea,2376,475,950
+07.06.21,Dalarnas län,Mexico,2381,476,952
+19.11.20,Waals-Brabant,Colombia,2386,477,954
+06.09.21,Tyumen Oblast,Vietnam,2391,478,956
+23.01.21,Berlin,Germany,2396,479,958
+20.11.21,Araucanía,Turkey,2401,480,960
+05.05.21,Ohio,India,2406,481,962
+30.03.21,Sumy oblast,South Africa,2411,482,964
+26.06.21,Oost-Vlaanderen,Ukraine,2416,483,966
+30.04.20,Vienna,Italy,2421,484,968
+28.06.20,North Region,New Zealand,2426,485,970
+14.12.20,Thái Bình,Chile,2431,486,972
+24.09.20,Central Visayas,New Zealand,2436,487,974
+14.09.21,Northern Territory,Sweden,2441,488,976
+23.10.20,North-East Region,Norway,2446,489,978
+27.06.21,Ivano-Frankivsk oblast,Singapore,2451,490,980
+11.01.21,Dōngběi,Sweden,2456,491,982
+18.09.20,Lorraine,Austria,2461,492,984
+15.02.21,Punjab,Norway,2466,493,986
+15.06.21,Limón,Costa Rica,2471,494,988
+01.08.21,Western Visayas,Russian Federation,2476,495,990
+04.12.20,Kerala,Ukraine,2481,496,992
+11.03.21,Vorarlberg,South Africa,2486,497,994
+23.03.20,Luxemburg,Philippines,2491,498,996
+05.06.21,Tasmania,Poland,2496,499,998

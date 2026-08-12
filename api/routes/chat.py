@@ -3,12 +3,15 @@ Chat API routes — POST /api/chat to start a task, GET /api/task/{id} to poll.
 Integrated with Supabase PostgreSQL Database Service for persistent storage.
 """
 import asyncio
+import logging
 import uuid
 from datetime import datetime
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 from api.websocket.stream import manager
 from db.supabase_client import db_service
@@ -87,20 +90,29 @@ async def run_task_async(
             "clarification_question": None,
             "error": None,
         }
-        final_state = await compiled_graph.ainvoke(initial_state)
+        final_state = initial_state
+        seen_events = 0
 
-        # Stream all events to connected WebSocket clients and save to DB
-        events = final_state.get("agent_events", [])
-        for ev in events:
-            await db_service.save_event(
-                task_id=task_id,
-                event_type=ev.get("event", "event"),
-                department=ev.get("department"),
-                agent=ev.get("agent"),
-                data=ev.get("data"),
-            )
-
-        await manager.send_events(task_id, events)
+        async for chunk in compiled_graph.astream(initial_state):
+            # chunk is a dict mapping node names to their state updates
+            for node_name, node_state in chunk.items():
+                if "agent_events" in node_state:
+                    current_events = node_state["agent_events"]
+                    new_events = current_events[seen_events:]
+                    if new_events:
+                        for ev in new_events:
+                            await db_service.save_event(
+                                task_id=task_id,
+                                event_type=ev.get("event", "event"),
+                                department=ev.get("department"),
+                                agent=ev.get("agent"),
+                                data=ev.get("data"),
+                            )
+                        await manager.send_events(task_id, new_events)
+                        seen_events = len(current_events)
+                
+                # Update final_state with the latest chunk
+                final_state.update(node_state)
 
         final_output = final_state.get("final_output", "Task completed.")
 
