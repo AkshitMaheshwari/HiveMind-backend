@@ -87,17 +87,17 @@ class ResilientLLM:
 
 def _build_gemini(model_id: str, api_key: str, temperature: float):
     from langchain_google_genai import ChatGoogleGenerativeAI
-    return ChatGoogleGenerativeAI(model=model_id, google_api_key=api_key.strip(), temperature=temperature)
+    return ChatGoogleGenerativeAI(model=model_id, google_api_key=api_key.strip(), temperature=temperature, max_retries=1, timeout=15)
 
 
 def _build_groq(model_id: str, api_key: str, temperature: float):
     from langchain_groq import ChatGroq
-    return ChatGroq(model=model_id, groq_api_key=api_key.strip(), temperature=temperature, max_tokens=4096)
+    return ChatGroq(model=model_id, groq_api_key=api_key.strip(), temperature=temperature, max_tokens=4096, max_retries=1, timeout=15)
 
 
 def _build_openai(model_id: str, api_key: str, temperature: float):
     from langchain_openai import ChatOpenAI
-    return ChatOpenAI(model=model_id, api_key=api_key.strip(), temperature=temperature)
+    return ChatOpenAI(model=model_id, api_key=api_key.strip(), temperature=temperature, max_retries=1, timeout=15)
 
 
 def get_llm(

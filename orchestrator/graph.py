@@ -26,7 +26,7 @@ from departments.research.graph import research_department_node
 from departments.content.graph import content_department_node
 from departments.code.graph import code_department_node
 from departments.document.graph import document_department_node
-from departments.financial.graph import financial_graph as financial_department_node
+from departments.financial.graph import financial_department_node
 
 
 # ─── Routing function: CEO → Departments ─────────────────────────────────────
