@@ -86,20 +86,6 @@ async def upload_file(
             detail="Failed to read the uploaded file. Please try again.",
         ) from exc
 
-    # ── Save file locally for Data Analyst access ─────────────────────────────
-    try:
-        import os
-        from pathlib import Path
-        backend_root = Path(__file__).resolve().parents[2]
-        upload_dir = backend_root / "data" / "uploads" / user_id
-        upload_dir.mkdir(parents=True, exist_ok=True)
-        file_path = upload_dir / filename
-        with open(file_path, "wb") as f:
-            f.write(file_bytes)
-        logger.info(f"Saved uploaded file locally at {file_path}")
-    except Exception as exc:
-        logger.warning(f"Failed to save file locally: {exc}")
-
     # ── Connector: validate + parse ───────────────────────────────────────────
     connector = FileConnector()
     try:
