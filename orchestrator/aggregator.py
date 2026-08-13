@@ -49,6 +49,28 @@ async def aggregator_node(state: OrchestratorState) -> Dict[str, Any]:
         if not output_str:
             output_str = f"I wasn't able to find specific information from the {dept} department. Please try rephrasing your question."
         final = output_str
+
+        # Artificially stream the output to the frontend for the ChatGPT typing effect
+        task_id = state.get("task_id")
+        if task_id:
+            try:
+                from api.websocket.stream import manager
+                import asyncio
+                
+                chunk_size = 8  # characters per chunk
+                accumulated = ""
+                for i in range(0, len(final), chunk_size):
+                    accumulated += final[i:i+chunk_size]
+                    await manager.broadcast(task_id, {
+                        "event": "partial_output",
+                        "data": accumulated,
+                        "timestamp": datetime.utcnow().isoformat(),
+                    })
+                    await asyncio.sleep(0.015) # Small delay for smooth typing effect
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"Failed to artificially stream final output: {e}")
+
         events.append({
             "event": "final_output",
             "data": final,
