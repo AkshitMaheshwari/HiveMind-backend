@@ -124,6 +124,13 @@ async def run_task_async(
             "completed_at": datetime.utcnow().isoformat(),
         })
 
+        # Ensure the frontend has the final output even if it wasn't streamed
+        await manager.broadcast(task_id, {
+            "event": "partial_output",
+            "data": final_output,
+            "timestamp": datetime.utcnow().isoformat(),
+        })
+
         # Send done signal
         await manager.broadcast(task_id, {
             "event": "task_done",
