@@ -2,10 +2,14 @@
 Root Orchestrator Graph — wires CEO + all department subgraphs + aggregator.
 
 Graph structure:
-  START → ceo_router → [research_dept | content_dept | code_dept] → aggregator → END
-  
+  START → ceo_router → [dept_nodes...] → aggregator → END
+
+Supports all 10 departments:
+  Tier 1: research, content, code, document, financial, analytics, strategy
+  Tier 2: legal, sales, design
+
 For sequential tasks: CEO routes to first dept, then re-routes after each completes.
-For parallel tasks: CEO fans out to all depts simultaneously (LangGraph Send API).
+For parallel tasks: CEO fans out to all depts simultaneously.
 """
 import sys
 from pathlib import Path
@@ -27,6 +31,18 @@ from departments.content.graph import content_department_node
 from departments.code.graph import code_department_node
 from departments.document.graph import document_department_node
 from departments.financial.graph import financial_department_node
+from departments.analytics.graph import analytics_department_node
+from departments.strategy.graph import strategy_department_node
+from departments.legal.graph import legal_department_node
+from departments.sales.graph import sales_department_node
+from departments.design.graph import design_department_node
+
+
+# All departments supported by the orchestrator
+_ALL_DEPTS = [
+    "research", "content", "code", "document", "financial",
+    "analytics", "strategy", "legal", "sales", "design",
+]
 
 
 # ─── Routing function: CEO → Departments ─────────────────────────────────────
@@ -91,6 +107,12 @@ def route_after_department(state: OrchestratorState) -> str:
     return "aggregator_node"
 
 
+# Build routing map for ALL departments
+_DEPT_ROUTE_MAP = {f"{d}_department_node": f"{d}_department_node" for d in _ALL_DEPTS}
+_DEPT_ROUTE_MAP["clarification_node"] = "clarification_node"
+_DEPT_ROUTE_MAP["aggregator_node"] = "aggregator_node"
+
+
 # ─── Build the Root Graph ─────────────────────────────────────────────────────
 
 def build_orchestrator_graph() -> StateGraph:
@@ -99,12 +121,19 @@ def build_orchestrator_graph() -> StateGraph:
     # ── Nodes ──────────────────────────────────────────────────────────────────
     graph.add_node("ceo_router_node", ceo_router_node)
     graph.add_node("clarification_node", clarification_node)
+    graph.add_node("aggregator_node", aggregator_node)
+
+    # Register all department nodes
     graph.add_node("research_department_node", research_department_node)
     graph.add_node("content_department_node", content_department_node)
     graph.add_node("code_department_node", code_department_node)
     graph.add_node("document_department_node", document_department_node)
     graph.add_node("financial_department_node", financial_department_node)
-    graph.add_node("aggregator_node", aggregator_node)
+    graph.add_node("analytics_department_node", analytics_department_node)
+    graph.add_node("strategy_department_node", strategy_department_node)
+    graph.add_node("legal_department_node", legal_department_node)
+    graph.add_node("sales_department_node", sales_department_node)
+    graph.add_node("design_department_node", design_department_node)
 
     # ── Edges ──────────────────────────────────────────────────────────────────
     graph.add_edge(START, "ceo_router_node")
@@ -113,30 +142,15 @@ def build_orchestrator_graph() -> StateGraph:
     graph.add_conditional_edges(
         "ceo_router_node",
         route_after_ceo,
-        {
-            "clarification_node": "clarification_node",
-            "research_department_node": "research_department_node",
-            "content_department_node": "content_department_node",
-            "code_department_node": "code_department_node",
-            "document_department_node": "document_department_node",
-            "financial_department_node": "financial_department_node",
-            "aggregator_node": "aggregator_node",
-        },
+        _DEPT_ROUTE_MAP,
     )
 
     # After each department → next department or aggregator
-    for dept in ["research", "content", "code", "document", "financial"]:
+    for dept in _ALL_DEPTS:
         graph.add_conditional_edges(
             f"{dept}_department_node",
             route_after_department,
-            {
-                "research_department_node": "research_department_node",
-                "content_department_node": "content_department_node",
-                "code_department_node": "code_department_node",
-                "document_department_node": "document_department_node",
-                "financial_department_node": "financial_department_node",
-                "aggregator_node": "aggregator_node",
-            },
+            _DEPT_ROUTE_MAP,
         )
 
     graph.add_edge("clarification_node", END)

@@ -163,13 +163,31 @@ class MarketDataAgent(ProductionAgent):
 class FundamentalAnalysisAgent(ProductionAgent):
     name = "FundamentalAnalysisAgent"
     department = "financial"
-    system_prompt = """You are a Fundamental Analyst. Analyze the financial health of the given companies."""
+    system_prompt = """You are a Fundamental Analyst. Analyze the financial health of the given companies. Use both uploaded financial document context (e.g. 10-K, annual reports) and live financial ratios."""
 
     async def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
         tickers = context.get("tickers", []) if context else []
         if not tickers:
             return AgentOutput(agent_name=self.name, department=self.department, success=True, content="No tickers provided.", metadata={"data": {}})
         
+        # Check uploaded filings / documents via RAG
+        rag_context = ""
+        user_id = (context or {}).get("user_id")
+        if user_id:
+            try:
+                from shared.tools.rag_retrieval import rag_document_search
+                query_str = f"Financial statements, earnings, 10-K, or annual reports for {' '.join(tickers)}"
+                rag_results = await asyncio.to_thread(
+                    rag_document_search,
+                    query=query_str,
+                    user_id=user_id,
+                    top_k=3,
+                )
+                if rag_results and rag_results.strip():
+                    rag_context = f"\nUploaded Filing Context:\n{rag_results[:2000]}"
+            except Exception:
+                pass
+
         import yfinance as yf
         data = {}
         for ticker in tickers:
@@ -184,7 +202,7 @@ class FundamentalAnalysisAgent(ProductionAgent):
                     "pe_ratio": float(info.get("trailingPE", 0)),
                     "debt_to_equity": float(info.get("debtToEquity", 0)),
                     "profit_margin": float(info.get("profitMargins", 0)),
-                    "summary": f"Analyzed {ticker} fundamentals."
+                    "summary": f"Analyzed {ticker} fundamentals.{rag_context}"
                 }
                 data[ticker] = fundamentals
             except Exception as e:
@@ -195,8 +213,9 @@ class FundamentalAnalysisAgent(ProductionAgent):
             department=self.department,
             success=True,
             content="Fundamental data fetched successfully.",
-            metadata={"data": data}
+            metadata={"data": data, "rag_context": rag_context}
         )
+
 
 
 # ─── TechnicalAnalysisAgent ───────────────────────────────────────────────────

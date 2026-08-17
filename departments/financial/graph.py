@@ -148,28 +148,37 @@ async def synthesizer_node(state: FinancialDeptState) -> Dict[str, Any]:
 
 # ─── Conditional Routing ──────────────────────────────────────────────────────
 
-def should_run_market(state: FinancialDeptState) -> str:
-    if "market_data" in state.get("required_agents", []): return "market_node"
-    return "synthesizer_node"
+# ─── Conditional Routing ──────────────────────────────────────────────────────
 
-def should_run_fundamental(state: FinancialDeptState) -> str:
-    if "fundamental" in state.get("required_agents", []): return "fundamental_node"
-    return "synthesizer_node"
+def route_financial_agents(state: FinancialDeptState) -> List[str]:
+    """Determine which worker nodes to run from router."""
+    required = state.get("required_agents", [])
+    nodes = []
+    if "market_data" in required:
+        nodes.append("market_node")
+    if "fundamental" in required:
+        nodes.append("fundamental_node")
+    if "technical" in required:
+        nodes.append("technical_node")
+    if "news" in required:
+        nodes.append("news_node")
+    if "portfolio" in required:
+        nodes.append("portfolio_node")
+    if "comparative" in required:
+        if "market_node" not in nodes:
+            nodes.append("market_node")
+        if "fundamental_node" not in nodes:
+            nodes.append("fundamental_node")
 
-def should_run_technical(state: FinancialDeptState) -> str:
-    if "technical" in state.get("required_agents", []): return "technical_node"
-    return "synthesizer_node"
+    if not nodes:
+        nodes = ["market_node"]
+    return nodes
 
-def should_run_news(state: FinancialDeptState) -> str:
-    if "news" in state.get("required_agents", []): return "news_node"
-    return "synthesizer_node"
 
-def should_run_portfolio(state: FinancialDeptState) -> str:
-    if "portfolio" in state.get("required_agents", []): return "portfolio_node"
-    return "synthesizer_node"
-
-def should_run_comparative(state: FinancialDeptState) -> str:
-    if "comparative" in state.get("required_agents", []): return "comparative_node"
+def route_after_market_fundamental(state: FinancialDeptState) -> str:
+    """If comparative analysis was requested, route through comparative_node."""
+    if "comparative" in state.get("required_agents", []):
+        return "comparative_node"
     return "synthesizer_node"
 
 
@@ -191,33 +200,25 @@ def build_financial_graph() -> StateGraph:
     # Edge from START to router
     builder.add_edge(START, "router_node")
 
-    # Conditional edges from router
-    builder.add_conditional_edges("router_node", should_run_market, ["market_node", "synthesizer_node"])
-    builder.add_conditional_edges("router_node", should_run_fundamental, ["fundamental_node", "synthesizer_node"])
-    builder.add_conditional_edges("router_node", should_run_technical, ["technical_node", "synthesizer_node"])
-    builder.add_conditional_edges("router_node", should_run_news, ["news_node", "synthesizer_node"])
-    builder.add_conditional_edges("router_node", should_run_portfolio, ["portfolio_node", "synthesizer_node"])
+    # Fan-out conditional edges from router
+    builder.add_conditional_edges(
+        "router_node",
+        route_financial_agents,
+        ["market_node", "fundamental_node", "technical_node", "news_node", "portfolio_node"]
+    )
 
-    # All worker nodes go to synthesizer, EXCEPT Comparative which needs Market/Fundamental first
-    # For a simple fan-in in LangGraph, we can just say:
-    builder.add_edge("market_node", "comparative_node")
-    builder.add_edge("fundamental_node", "comparative_node")
-    
-    # But wait, Comparative should only run if requested. If not requested, comparative_node would just be skipped?
-    # No, add_edge makes it run unconditionally after market_node.
-    # To fix this, we'll conditionally route from Market/Fundamental to Comparative or Synthesizer.
-    
-    def after_market(state: FinancialDeptState):
-        if "comparative" in state.get("required_agents", []): return "comparative_node"
-        return "synthesizer_node"
-        
-    def after_fundamental(state: FinancialDeptState):
-        if "comparative" in state.get("required_agents", []): return "comparative_node"
-        return "synthesizer_node"
+    # Fan-in: Market & Fundamental conditionally go to comparative or synthesizer
+    builder.add_conditional_edges(
+        "market_node",
+        route_after_market_fundamental,
+        {"comparative_node": "comparative_node", "synthesizer_node": "synthesizer_node"}
+    )
+    builder.add_conditional_edges(
+        "fundamental_node",
+        route_after_market_fundamental,
+        {"comparative_node": "comparative_node", "synthesizer_node": "synthesizer_node"}
+    )
 
-    builder.add_conditional_edges("market_node", after_market, ["comparative_node", "synthesizer_node"])
-    builder.add_conditional_edges("fundamental_node", after_fundamental, ["comparative_node", "synthesizer_node"])
-    
     builder.add_edge("technical_node", "synthesizer_node")
     builder.add_edge("news_node", "synthesizer_node")
     builder.add_edge("portfolio_node", "synthesizer_node")
@@ -254,6 +255,7 @@ async def financial_department_node(state) -> Dict[str, Any]:
     initial_state = {
         "task": financial_task,
         "original_request": state["user_request"],
+        "user_id": state.get("user_id"),
         "api_keys": state.get("api_keys"),
         "selected_model": state.get("selected_model"),
         "events": [],
@@ -262,13 +264,6 @@ async def financial_department_node(state) -> Dict[str, Any]:
     final_state = await financial_subgraph.ainvoke(initial_state)
 
     events.extend(final_state.get("events", []))
-    
-    # Extract charts_json if available and pass it as an event
-    charts_json = None
-    
-    # We need to look at the last event from SynthesizerAgent or just fetch from final_state metadata if possible.
-    # Since our synthesizer_node does not return metadata, we need to make it return charts_json in final_state.
-    
     events.append({
         "event": "department_done",
         "department": "financial",
@@ -276,6 +271,7 @@ async def financial_department_node(state) -> Dict[str, Any]:
         "data": "Financial department completed successfully",
         "timestamp": datetime.utcnow().isoformat(),
     })
+
 
     department_outputs = dict(state.get("department_outputs", {}))
     department_outputs["financial"] = final_state.get("final_report", "Financial analysis completed.")

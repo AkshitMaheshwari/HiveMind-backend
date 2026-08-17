@@ -1,13 +1,71 @@
 """
 Content Department — Worker Agents
+- ContentRouterAgent: Routes to appropriate content pipeline (Tier 2 recursive router pattern)
 - CopywriterAgent: Creates engaging draft content
 - SEOOptimizerAgent: Optimizes for search engines
 - EditorAgent: Polishes and proofreads the final content
 """
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Literal
 
 from pydantic import BaseModel, Field
 from shared.base_agent import ProductionAgent, AgentOutput
+
+
+# ─── Content Router Schema ────────────────────────────────────────────────────
+
+class ContentRoute(BaseModel):
+    content_type: Literal["blog", "social", "seo_copy", "full_pipeline"] = Field(
+        description=(
+            "blog = long-form blog post (full pipeline: Copywriter → SEO → Editor); "
+            "social = short social media post (Copywriter only, casual tone); "
+            "seo_copy = landing page or SEO copy (Copywriter → SEO, skip Editor); "
+            "full_pipeline = default when unclear."
+        )
+    )
+    tone: str = Field(description="Recommended tone: professional/casual/technical/conversational")
+    reasoning: str = Field(description="Brief reason for this routing decision")
+
+
+# ─── ContentRouterAgent ───────────────────────────────────────────────────────
+
+class ContentRouterAgent(ProductionAgent):
+    """
+    Implements the recursive Router pattern inside the Content Department.
+    CEO routes to Content dept; Content dept routes internally to its own specialists.
+    This mirrors the Research dept's ResearchRouterAgent pattern.
+    """
+    name = "ContentRouterAgent"
+    department = "content"
+    system_prompt = """You are the Content Director. Classify the content request and choose the right pipeline.
+
+Content types:
+- "blog": Long-form blog post, article, or deep-dive content (needs all 3 agents: Copywriter → SEO → Editor)
+- "social": Short social media post, tweet thread, LinkedIn post (Copywriter only, casual/engaging tone)
+- "seo_copy": Landing page, product description, SEO-optimized web copy (Copywriter → SEO, skip Editor)
+- "full_pipeline": Default when unclear or multiple content types requested
+
+Choose the MOST specific type that fits."""
+
+    async def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
+        try:
+            result: ContentRoute = await self._ainvoke_structured(
+                f"Content request: {task}\n\nClassify and route.", ContentRoute
+            )
+            return AgentOutput(
+                agent_name=self.name, department=self.department, success=True,
+                content=result.reasoning,
+                metadata={
+                    "content_type": result.content_type,
+                    "tone": result.tone,
+                    "reasoning": result.reasoning,
+                }
+            )
+        except Exception as e:
+            return AgentOutput(
+                agent_name=self.name, department=self.department, success=False,
+                content="Routing to full pipeline (fallback).", error=str(e),
+                metadata={"content_type": "full_pipeline", "tone": "professional"}
+            )
 
 
 # ─── Pydantic schemas ─────────────────────────────────────────────────────────

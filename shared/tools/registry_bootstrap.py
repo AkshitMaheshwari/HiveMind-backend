@@ -79,6 +79,9 @@ def bootstrap() -> None:
     ))
 
     # ── Code execution tools ──────────────────────────────────────────────────
+    # Shared Code sandbox: tagged for ALL compute-heavy departments.
+    # Code, Financial (TechnicalAnalysis, PortfolioAnalyst), Analytics, Strategy
+    # all reuse this single tool — this shared reuse is a core hive-mind property.
     from shared.tools.code import execute_code, execute_code_local
 
     registry.register(ToolSpec(
@@ -86,9 +89,10 @@ def bootstrap() -> None:
         description=(
             "Execute Python code in a sandboxed environment (E2B cloud or local subprocess). "
             "Returns stdout, stderr, and a success flag. "
-            "Best for: running generated code, testing scripts, verifying algorithmic output."
+            "Best for: running generated code, testing scripts, data analysis, financial modeling, "
+            "statistical calculations, chart data generation, algorithmic output verification."
         ),
-        tags=["code"],
+        tags=["code", "financial", "analytics", "strategy"],
         fn=execute_code,
     ))
 
@@ -99,11 +103,15 @@ def bootstrap() -> None:
             "Returns stdout, stderr, and a success flag. "
             "Use when E2B is unavailable or for low-risk script execution."
         ),
-        tags=["code"],
+        tags=["code", "financial", "analytics", "strategy"],
         fn=execute_code_local,
     ))
 
     # ── RAG retrieval tool ────────────────────────────────────────────────────
+    # HIVE MIND PROPERTY: Every specialist agent in any department can call
+    # retrieve_from_knowledge_base — knowledge is NOT siloed per department.
+    # Financial agents can search uploaded filings; Legal agents can search
+    # uploaded contracts; Strategy agents can search market reports, etc.
     from shared.tools.rag_retrieval import rag_document_search
 
     registry.register(ToolSpec(
@@ -112,11 +120,32 @@ def bootstrap() -> None:
             "Search the authenticated user's uploaded documents using semantic vector similarity. "
             "Returns relevant excerpts with source attribution. "
             "Strictly scoped to the requesting user's documents — never returns other users' data. "
-            "Best for: answering questions about documents the user has uploaded (PDFs, Excel files, CSVs)."
+            "Best for: answering questions about documents the user has uploaded (PDFs, Excel files, "
+            "CSVs, contracts, financial filings, research reports, or any private knowledge base)."
         ),
-        tags=["research"],
+        tags=["research", "content", "code", "financial", "analytics", "strategy", "legal", "sales", "document"],
         fn=rag_document_search,
     ))
+
+    # ── Image generation tool ─────────────────────────────────────────────────
+    # Exclusively for the Design Department. The only genuinely new tool category
+    # in the Tier 2 additions — every other Tier 2 dept reuses existing tools.
+    try:
+        from shared.tools.image_generation import generate_image
+
+        registry.register(ToolSpec(
+            name="generate_image",
+            description=(
+                "Generate an image using OpenAI DALL-E 3. "
+                "Returns the URL of the generated image. "
+                "Best for: logo concepts, brand mockups, pitch deck visuals, icon generation, "
+                "product renders, and any visual design asset creation."
+            ),
+            tags=["design"],
+            fn=generate_image,
+        ))
+    except Exception as _img_exc:
+        logger.warning("generate_image tool not registered (missing openai or key): %s", _img_exc)
 
     # ── Demo / utility tools ──────────────────────────────────────────────────
     from shared.tools.ping import ping_tool

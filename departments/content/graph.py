@@ -1,6 +1,15 @@
 """
 Content Department LangGraph subgraph.
-Flow: copywriter_node → seo_optimizer_node → editor_node → [done]
+
+Flow:
+  START → content_router_node → [blog/social/seo_copy/full_pipeline]
+  - blog:         copywriter_node → seo_optimizer_node → editor_node → END
+  - social:       copywriter_node → END (fast path, no SEO/editing needed)
+  - seo_copy:     copywriter_node → seo_optimizer_node → END
+  - full_pipeline: copywriter_node → seo_optimizer_node → editor_node → END
+
+This implements the recursive Router pattern: CEO routes to Content dept,
+Content dept routes internally to its own specialist pipeline.
 """
 from datetime import datetime
 from typing import Any, Dict
@@ -8,18 +17,19 @@ from typing import Any, Dict
 from langgraph.graph import StateGraph, START, END
 
 from departments.content.state import ContentDeptState
-from departments.content.agents import CopywriterAgent, SEOOptimizerAgent, EditorAgent
+from departments.content.agents import ContentRouterAgent, CopywriterAgent, SEOOptimizerAgent, EditorAgent
 
 
 # ─── Agent factory ───────────────────────────────────────────────────────────
 
 def _make_agents(api_keys=None, selected_model=None):
     """Create fresh agent instances with the given API keys and model."""
-    return (
-        CopywriterAgent(api_keys=api_keys, selected_model=selected_model),
-        SEOOptimizerAgent(api_keys=api_keys, selected_model=selected_model),
-        EditorAgent(api_keys=api_keys, selected_model=selected_model),
-    )
+    return {
+        "router": ContentRouterAgent(api_keys=api_keys, selected_model=selected_model),
+        "copywriter": CopywriterAgent(api_keys=api_keys, selected_model=selected_model),
+        "seo": SEOOptimizerAgent(api_keys=api_keys, selected_model=selected_model),
+        "editor": EditorAgent(api_keys=api_keys, selected_model=selected_model),
+    }
 
 
 def _emit(state: ContentDeptState, event: str, agent: str, data: str = "") -> list:
@@ -34,17 +44,40 @@ def _emit(state: ContentDeptState, event: str, agent: str, data: str = "") -> li
     return events
 
 
+# ─── Content Router Node ──────────────────────────────────────────────────────
+
+async def content_router_node(state: ContentDeptState) -> Dict[str, Any]:
+    """ContentRouterAgent — decides which pipeline to run (blog/social/seo_copy/full_pipeline)."""
+    agents = _make_agents(state.get("api_keys"), state.get("selected_model"))
+    events = _emit(state, "agent_working", "ContentRouterAgent", "Classifying content type...")
+    output = await agents["router"].execute(state["task"])
+    content_type = output.metadata.get("content_type", "full_pipeline")
+    tone = output.metadata.get("tone", "professional")
+    events = _emit({**state, "events": events}, "agent_done", "ContentRouterAgent",
+                   f"Routing to: {content_type} pipeline ({tone} tone)")
+    return {"content_type": content_type, "preferred_tone": tone, "events": events}
+
+
+def route_by_content_type(state: ContentDeptState) -> str:
+    """Conditional edge: route to the appropriate pipeline start."""
+    content_type = state.get("content_type", "full_pipeline")
+    if content_type == "social":
+        return "copywriter_node_social"  # Skip SEO + Editor
+    return "copywriter_node"  # blog, seo_copy, full_pipeline all start with copywriter
+
+
 # ─── Graph Nodes ──────────────────────────────────────────────────────────────
 
 async def copywriter_node(state: ContentDeptState) -> Dict[str, Any]:
     """Copywriter Agent — creates the initial content draft."""
-    copywriter, _, _ = _make_agents(state.get("api_keys"), state.get("selected_model"))
+    agents = _make_agents(state.get("api_keys"), state.get("selected_model"))
+    tone_hint = state.get("preferred_tone", "professional")
 
     events = _emit(state, "agent_working", "CopywriterAgent", "Writing content draft...")
 
-    output = await copywriter.execute(
+    output = await agents["copywriter"].execute(
         state["task"],
-        context={"research_context": state.get("research_context", "")},
+        context={"research_context": state.get("research_context", ""), "tone": tone_hint},
     )
 
     events = _emit(
@@ -60,13 +93,25 @@ async def copywriter_node(state: ContentDeptState) -> Dict[str, Any]:
     }
 
 
+async def copywriter_node_social(state: ContentDeptState) -> Dict[str, Any]:
+    """Fast-path Copywriter for social media — no SEO or editing needed."""
+    agents = _make_agents(state.get("api_keys"), state.get("selected_model"))
+    events = _emit(state, "agent_working", "CopywriterAgent", "Writing social post (fast path)...")
+    output = await agents["copywriter"].execute(
+        state["task"],
+        context={"research_context": state.get("research_context", ""), "tone": "casual/engaging"},
+    )
+    events = _emit({**state, "events": events}, "agent_done", "CopywriterAgent", "Social post ready")
+    return {"draft_content": output.content, "final_content": output.content, "events": events}
+
+
 async def seo_optimizer_node(state: ContentDeptState) -> Dict[str, Any]:
     """SEO Optimizer Agent — keyword optimization."""
-    _, seo_optimizer, _ = _make_agents(state.get("api_keys"), state.get("selected_model"))
+    agents = _make_agents(state.get("api_keys"), state.get("selected_model"))
 
     events = _emit(state, "agent_working", "SEOOptimizerAgent", "Optimizing for search engines...")
 
-    output = await seo_optimizer.execute(
+    output = await agents["seo"].execute(
         state["task"],
         context={"draft_content": state.get("draft_content", "")},
     )
@@ -78,21 +123,24 @@ async def seo_optimizer_node(state: ContentDeptState) -> Dict[str, Any]:
         f"SEO score: {output.metadata.get('seo_score', 'N/A')}",
     )
 
+    # For seo_copy pipeline: make this the final content (no editor)
+    is_seo_only = state.get("content_type") == "seo_copy"
     return {
         "seo_keywords": output.metadata.get("secondary_keywords", []),
         "meta_description": output.metadata.get("meta_description", ""),
         "seo_optimized_content": output.content,
+        **(({"final_content": output.content}) if is_seo_only else {}),
         "events": events,
     }
 
 
 async def editor_node(state: ContentDeptState) -> Dict[str, Any]:
     """Editor Agent — final polish and proofreading."""
-    _, _, editor = _make_agents(state.get("api_keys"), state.get("selected_model"))
+    agents = _make_agents(state.get("api_keys"), state.get("selected_model"))
 
     events = _emit(state, "agent_working", "EditorAgent", "Editing and proofreading...")
 
-    output = await editor.execute(
+    output = await agents["editor"].execute(
         state["task"],
         context={
             "seo_content": state.get("seo_optimized_content", ""),
@@ -114,17 +162,41 @@ async def editor_node(state: ContentDeptState) -> Dict[str, Any]:
     }
 
 
-# ─── Build the Content Subgraph ───────────────────────────────────────────────
+def route_after_seo(state: ContentDeptState) -> str:
+    """After SEO: skip Editor for seo_copy pipeline, run Editor for blog/full_pipeline."""
+    if state.get("content_type") == "seo_copy":
+        return END
+    return "editor_node"
+
+
+# ─── Build the Content Subgraph ────────────────────────────────────────────────────
 
 content_graph = StateGraph(ContentDeptState)
 
+content_graph.add_node("content_router_node", content_router_node)
 content_graph.add_node("copywriter_node", copywriter_node)
+content_graph.add_node("copywriter_node_social", copywriter_node_social)
 content_graph.add_node("seo_optimizer_node", seo_optimizer_node)
 content_graph.add_node("editor_node", editor_node)
 
-content_graph.add_edge(START, "copywriter_node")
+# START → Router → (conditional) pipeline entry point
+content_graph.add_edge(START, "content_router_node")
+content_graph.add_conditional_edges(
+    "content_router_node",
+    route_by_content_type,
+    {"copywriter_node": "copywriter_node", "copywriter_node_social": "copywriter_node_social"}
+)
+
+# Social fast-path: Copywriter → END
+content_graph.add_edge("copywriter_node_social", END)
+
+# Full pipeline: Copywriter → SEO → (conditional) Editor or END
 content_graph.add_edge("copywriter_node", "seo_optimizer_node")
-content_graph.add_edge("seo_optimizer_node", "editor_node")
+content_graph.add_conditional_edges(
+    "seo_optimizer_node",
+    route_after_seo,
+    {"editor_node": "editor_node", END: END}
+)
 content_graph.add_edge("editor_node", END)
 
 content_subgraph = content_graph.compile()
