@@ -34,7 +34,7 @@ class OrchestratorState(TypedDict):
     conversation_id: str
     user_id: str
     api_keys: Optional[Dict[str, str]]
-    selected_model: Optional[str]  # e.g. "gemini-2.0-flash", "llama-3.3-70b-versatile"
+    selected_model: Optional[str]  # e.g. "gemini-2.0-flash", "openai/gpt-oss-120b"
 
     # ── Conversation Memory ────────────────────────────────────────
     # List of prior turns: [{"role": "user"|"assistant", "content": "..."}]

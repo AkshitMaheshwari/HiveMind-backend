@@ -30,7 +30,7 @@ class ChatRequest(BaseModel):
     message: str
     conversation_id: str = "default"
     api_keys: Optional[ApiKeys] = None
-    selected_model: Optional[str] = None  # e.g. "gemini-2.0-flash", "llama-3.3-70b-versatile"
+    selected_model: Optional[str] = None  # e.g. "gemini-2.0-flash", "openai/gpt-oss-120b"
 
 
 class ChatResponse(BaseModel):

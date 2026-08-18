@@ -23,14 +23,12 @@ MODEL_REGISTRY = {
         {"id": "gemini-2.5-flash-preview-05-20", "name": "Gemini 2.5 Flash Preview", "description": "Latest preview with thinking capabilities"},
     ],
     "groq": [
-        {"id": "llama-3.3-70b-versatile",  "name": "Llama 3.3 70B Versatile",  "description": "Best quality Llama on Groq, 100k TPD"},
-        {"id": "llama-3.1-8b-instant",     "name": "Llama 3.1 8B Instant",     "description": "Ultra-fast, 500k TPD limit"},
-        {"id": "llama3-70b-8192",          "name": "Llama 3 70B",              "description": "Powerful open model, 8k context"},
-        {"id": "llama3-8b-8192",           "name": "Llama 3 8B",               "description": "Fast and efficient, 8k context"},
-        {"id": "mixtral-8x7b-32768",       "name": "Mixtral 8x7B",             "description": "Mixture of experts, 32k context"},
-        {"id": "gemma2-9b-it",             "name": "Gemma 2 9B",               "description": "Google's Gemma 2 on Groq"},
-        {"id": "llama-3.1-70b-versatile",  "name": "Llama 3.1 70B Versatile",  "description": "Strong reasoning, multilingual"},
-        {"id": "deepseek-r1-distill-llama-70b", "name": "DeepSeek R1 Distill 70B", "description": "Reasoning-focused distilled model"},
+        {"id": "openai/gpt-oss-120b", "name": "GPT OSS 120B", "description": "Flagship open-weights on Groq, 500 T/s, 131k context"},
+        {"id": "openai/gpt-oss-20b",  "name": "GPT OSS 20B",  "description": "Ultra-fast open weights on Groq, 1000 T/s, 131k context"},
+        {"id": "qwen/qwen3.6-27b",    "name": "Qwen 3.6 27B",  "description": "Alibaba reasoning model, 131k context, tools support"},
+        {"id": "groq/compound",       "name": "Groq Compound", "description": "Groq engineered multi-agent system, 131k context"},
+        {"id": "groq/compound-mini",  "name": "Compound Mini", "description": "Fast lightweight compound model, 131k context"},
+        {"id": "allam-2-7b",          "name": "ALLaM 2 7B",    "description": "SDAIA bilingual Arabic/English model, 4k context"},
     ],
     "openai": [
         {"id": "gpt-4o",       "name": "GPT-4o",       "description": "Best OpenAI model, multimodal"},
@@ -174,8 +172,8 @@ def get_llm(
 
     if groq_key and not groq_key.startswith("your-"):
         try:
-            candidates.append(_build_groq("llama-3.1-8b-instant", groq_key, 0.1))
-            candidates.append(_build_groq("llama-3.3-70b-versatile", groq_key, 0.1))
+            candidates.append(_build_groq("openai/gpt-oss-20b", groq_key, 0.1))
+            candidates.append(_build_groq("openai/gpt-oss-120b", groq_key, 0.1))
         except Exception as e:
             logger.warning(f"Groq initialization error: {e}")
 
