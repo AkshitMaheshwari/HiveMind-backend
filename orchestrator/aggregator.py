@@ -7,6 +7,7 @@ from typing import Any, Dict
 from langchain_core.messages import SystemMessage, HumanMessage
 
 from orchestrator.state import OrchestratorState
+from shared.base_agent import normalize_llm_content
 
 
 AGGREGATOR_PROMPT = """You are a knowledgeable AI assistant synthesizing research from multiple specialized agents.
@@ -45,10 +46,9 @@ async def aggregator_node(state: OrchestratorState) -> Dict[str, Any]:
     # If only one department ran, return its output directly
     if len(department_outputs) == 1:
         dept, output = list(department_outputs.items())[0]
-        output_str = str(output).strip() if output else ""
-        if not output_str:
-            output_str = f"I wasn't able to find specific information from the {dept} department. Please try rephrasing your question."
-        final = output_str
+        final = normalize_llm_content(output)
+        if not final:
+            final = f"I wasn't able to find specific information from the {dept} department. Please try rephrasing your question."
 
         # Artificially stream the output to the frontend for the ChatGPT typing effect
         task_id = state.get("task_id")
@@ -57,7 +57,7 @@ async def aggregator_node(state: OrchestratorState) -> Dict[str, Any]:
                 from api.websocket.stream import manager
                 import asyncio
                 
-                chunk_size = 8  # characters per chunk
+                chunk_size = 6  # characters per chunk
                 accumulated = ""
                 for i in range(0, len(final), chunk_size):
                     accumulated += final[i:i+chunk_size]
@@ -66,7 +66,7 @@ async def aggregator_node(state: OrchestratorState) -> Dict[str, Any]:
                         "data": accumulated,
                         "timestamp": datetime.utcnow().isoformat(),
                     })
-                    await asyncio.sleep(0.015) # Small delay for smooth typing effect
+                    await asyncio.sleep(0.012) # Small delay for smooth typing effect
             except Exception as e:
                 import logging
                 logging.getLogger(__name__).warning(f"Failed to artificially stream final output: {e}")
@@ -83,7 +83,8 @@ async def aggregator_node(state: OrchestratorState) -> Dict[str, Any]:
     # Multiple departments — synthesize
     combined_context = f"User Request: {state['user_request']}\n\n"
     for dept, output in department_outputs.items():
-        combined_context += f"## {dept.upper()} DEPARTMENT OUTPUT:\n{output}\n\n---\n\n"
+        cleaned_dept_out = normalize_llm_content(output)
+        combined_context += f"## {dept.upper()} DEPARTMENT OUTPUT:\n{cleaned_dept_out}\n\n---\n\n"
 
     try:
         from api.websocket.stream import manager
@@ -97,8 +98,9 @@ async def aggregator_node(state: OrchestratorState) -> Dict[str, Any]:
             SystemMessage(content=AGGREGATOR_PROMPT),
             HumanMessage(content=combined_context),
         ]):
-            if chunk.content:
-                accumulated += chunk.content
+            content = normalize_llm_content(chunk.content)
+            if content:
+                accumulated += content
                 if task_id:
                     await manager.broadcast(task_id, {
                         "event": "partial_output",
@@ -106,12 +108,12 @@ async def aggregator_node(state: OrchestratorState) -> Dict[str, Any]:
                         "timestamp": datetime.utcnow().isoformat(),
                     })
         
-        final = accumulated
+        final = normalize_llm_content(accumulated)
     except Exception as e:
         # Fallback: just concatenate departments cleanly
         final = f"**Based on your question:** {state['user_request']}\n\n"
         for dept, output in department_outputs.items():
-            final += f"### {dept.capitalize()} Findings\n\n{output}\n\n"
+            final += f"### {dept.capitalize()} Findings\n\n{normalize_llm_content(output)}\n\n"
 
     events.append({
         "event": "final_output",
