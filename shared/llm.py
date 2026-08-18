@@ -15,12 +15,13 @@ logger = logging.getLogger("llm_factory")
 
 MODEL_REGISTRY = {
     "gemini": [
-        {"id": "gemini-2.0-flash",        "name": "Gemini 2.0 Flash",        "description": "Fast multimodal model, best for most tasks"},
-        {"id": "gemini-2.0-flash-lite",   "name": "Gemini 2.0 Flash Lite",   "description": "Lightest & fastest Gemini model"},
-        {"id": "gemini-1.5-pro",          "name": "Gemini 1.5 Pro",          "description": "High capability, long context (1M tokens)"},
-        {"id": "gemini-1.5-flash",        "name": "Gemini 1.5 Flash",        "description": "Fast and versatile performance"},
-        {"id": "gemini-1.5-flash-8b",     "name": "Gemini 1.5 Flash-8B",     "description": "High volume tasks at lower intelligence"},
-        {"id": "gemini-2.5-flash-preview-05-20", "name": "Gemini 2.5 Flash Preview", "description": "Latest preview with thinking capabilities"},
+        {"id": "gemini-3.5-flash",              "name": "Gemini 3.5 Flash",              "description": "Next-gen flagship multimodal model, high speed & intelligence"},
+        {"id": "gemini-3.1-flash-lite",         "name": "Gemini 3.1 Flash Lite",         "description": "Ultra-lightweight & lightning fast for high-throughput tasks"},
+        {"id": "gemini-3-flash-preview",        "name": "Gemini 3 Flash Preview",        "description": "Next-gen preview model with enhanced reasoning"},
+        {"id": "gemini-3.1-flash-live-preview",   "name": "Gemini 3.1 Flash Live Preview", "description": "Real-time low latency multimodal streaming preview"},
+        {"id": "gemini-2.5-pro",                "name": "Gemini 2.5 Pro",                "description": "Deep reasoning & complex multi-step analysis"},
+        {"id": "gemini-2.5-flash",              "name": "Gemini 2.5 Flash",              "description": "Fast and versatile general-purpose performance"},
+        {"id": "gemini-2.5-flash-lite",         "name": "Gemini 2.5 Flash Lite",         "description": "Cost-effective, low latency execution"},
     ],
     "groq": [
         {"id": "openai/gpt-oss-120b", "name": "GPT OSS 120B", "description": "Flagship open-weights on Groq, 500 T/s, 131k context"},
@@ -164,9 +165,9 @@ def get_llm(
 
     if google_key and not google_key.startswith("your-"):
         try:
-            candidates.append(_build_gemini("gemini-2.0-flash", google_key, temp))
-            candidates.append(_build_gemini("gemini-2.0-flash-lite", google_key, temp))
-            candidates.append(_build_gemini("gemini-1.5-pro", google_key, temp))
+            candidates.append(_build_gemini("gemini-2.5-flash", google_key, temp))
+            candidates.append(_build_gemini("gemini-3.5-flash", google_key, temp))
+            candidates.append(_build_gemini("gemini-2.5-pro", google_key, temp))
         except Exception as e:
             logger.warning(f"Google Gemini initialization error: {e}")
 
