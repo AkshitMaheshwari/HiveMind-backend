@@ -5,24 +5,10 @@ Logs every department start/done event with user_id for per-user data isolation
 tracking and basic security auditing.
 
 Design decisions:
-- Non-blocking: uses asyncio.create_task so it never slows down agent execution.
-- Dual sink: writes to a local JSONL file AND Supabase (if connected).
+- Non-blocking: uses asyncio.create_task and run_in_executor so it never slows down agent execution.
+- Dual sink: writes to a local JSONL file AND Supabase (if connected and table exists).
 - Per-user isolation: user_id is on every log entry — cannot be omitted.
-- Fail-safe: all errors are swallowed with a warning — audit failures must
-  never crash the main pipeline.
-
-Usage::
-
-    from shared.audit import log_event
-
-    # Fire-and-forget in an async context
-    asyncio.create_task(log_event(
-        user_id=state.get("user_id"),
-        event_type="department_started",
-        department="analytics",
-        agent="DataProfilerAgent",
-        data={"task": task[:100]},
-    ))
+- Fail-safe: all errors are swallowed — audit failures must never crash or block the main pipeline.
 """
 import asyncio
 import json
@@ -63,17 +49,18 @@ def _write_local(entry: Dict[str, Any]) -> None:
         with open(_AUDIT_LOG_PATH, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry) + "\n")
     except Exception as exc:
-        logger.warning("audit: local write failed: %s", exc)
+        pass
 
 
-async def _write_supabase(entry: Dict[str, Any]) -> None:
+def _write_supabase_sync(entry: Dict[str, Any]) -> None:
     """Append entry to the Supabase audit_logs table if connected."""
     try:
         from db.supabase_client import db_service
         if db_service.is_connected:
-            await db_service.client.table("audit_logs").insert(entry).execute()
-    except Exception as exc:
-        logger.warning("audit: Supabase write failed: %s", exc)
+            db_service.client.table("audit_logs").insert(entry).execute()
+    except Exception:
+        # Table might not exist yet; silently skip without throwing
+        pass
 
 
 async def log_event(
@@ -85,26 +72,13 @@ async def log_event(
 ) -> None:
     """
     Record an audit event asynchronously.
-
-    Parameters:
-        user_id: The authenticated user who triggered this event.
-                 Per-user data isolation is enforced by always including this.
-        event_type: e.g. "department_started", "department_done", "tool_called".
-        department: The department generating this event, e.g. "analytics".
-        agent: The specific agent, e.g. "DataProfilerAgent".
-        data: Optional extra key-value payload (task preview, result sizes, etc.).
-
-    This function never raises — all failures are logged as warnings only.
+    This function never raises — all failures are handled silently.
     """
     try:
         entry = _build_entry(user_id, event_type, department, agent, data)
-
-        # Write to local file in a thread (non-blocking)
         loop = asyncio.get_event_loop()
+        # Non-blocking executor writes
         await loop.run_in_executor(None, _write_local, entry)
-
-        # Write to Supabase (best-effort)
-        await _write_supabase(entry)
-
-    except Exception as exc:
-        logger.warning("audit: log_event failed silently: %s", exc)
+        await loop.run_in_executor(None, _write_supabase_sync, entry)
+    except Exception:
+        pass

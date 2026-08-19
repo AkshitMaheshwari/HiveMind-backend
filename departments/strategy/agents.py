@@ -53,35 +53,15 @@ class PitchDeckOutput(BaseModel):
 class StrategyRouterAgent(ProductionAgent):
     name = "StrategyRouterAgent"
     department = "strategy"
-    system_prompt = """You are the Strategy Director at a top consulting firm.
-Analyze the user's strategy request and determine which specialist agents to deploy.
-
-Agent options:
-- 'market': Market size, trends, TAM/SAM/SOM analysis
-- 'competitor': Competitive landscape, positioning, market share
-- 'financial_model': Revenue projections, unit economics, break-even
-- 'swot': Strengths, weaknesses, opportunities, threats analysis
-- 'business_plan': Executive summary, GTM strategy, operations
-- 'pitch_deck': Investor pitch deck (include only if explicitly requested)
-
-Select the minimum set needed to answer the question well."""
 
     async def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
-        try:
-            result: StrategyRoute = await self._ainvoke_structured(
-                f"Strategy request: {task}\n\nSelect agents to deploy.", StrategyRoute
-            )
-            return AgentOutput(
-                agent_name=self.name, department=self.department, success=True,
-                content=result.reasoning,
-                metadata={"required_agents": result.required_agents, "reasoning": result.reasoning}
-            )
-        except Exception as e:
-            return AgentOutput(
-                agent_name=self.name, department=self.department, success=False,
-                content="", error=str(e),
-                metadata={"required_agents": ["market", "competitor", "swot", "business_plan"]}
-            )
+        # Deploy all 4 specialist analysts in parallel for comprehensive strategy requests
+        required = ["market", "competitor", "financial_model", "swot", "business_plan", "pitch_deck"]
+        return AgentOutput(
+            agent_name=self.name, department=self.department, success=True,
+            content="Deploying parallel strategy specialists (Market, Competitors, Financial Sandbox, SWOT, Pitch Deck).",
+            metadata={"required_agents": required, "reasoning": "Full strategic analysis requested."}
+        )
 
 
 # ─── MarketAnalystAgent ───────────────────────────────────────────────────────
@@ -100,42 +80,24 @@ Use the research data provided to quantify the market opportunity."""
 
     async def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
         try:
-            # INTER-DEPT CALL: Strategy calls Research directly
-            from shared.inter_dept import call_research_dept
-            api_keys = (context or {}).get("api_keys")
-            selected_model = (context or {}).get("selected_model")
-            user_id = (context or {}).get("user_id")
+            query = f"Market size TAM SAM SOM statistics trends: {task[:200]}"
+            raw_research = await asyncio.to_thread(web_search, query, max_results=4)
 
-            research_task = (
-                f"Market research for: {task}. "
-                f"Find: total addressable market size, growth rate (CAGR), "
-                f"key market segments, major trends, and customer demographics."
-            )
-
-            raw_research = await call_research_dept(
-                task=research_task,
-                api_keys=api_keys,
-                selected_model=selected_model,
-                user_id=user_id,
-            )
-
-            # Synthesize the research into market analysis
             prompt = f"""Strategy task: {task}
 
-Raw market research (from Research Department):
-{raw_research[:4000]}
+Raw market data gathered:
+{raw_research[:3500]}
 
-Synthesize this into a structured market analysis covering:
-1. Market size and TAM/SAM/SOM estimates
+Synthesize this into a concise, structured market analysis covering:
+1. TAM, SAM, and SOM estimates (distinguish verified data vs assumptions)
 2. Growth rate and trajectory (CAGR)
-3. Key customer segments
-4. Critical market trends
-5. Market timing and entry window"""
+3. Key customer segments & demographics
+4. Critical industry tailwinds and trends"""
 
             analysis = await self._ainvoke(prompt)
             return AgentOutput(
                 agent_name=self.name, department=self.department, success=True,
-                content=analysis, metadata={"raw_research": raw_research[:500]}
+                content=analysis, metadata={"raw_research": raw_research[:300]}
             )
         except Exception as e:
             return AgentOutput(
@@ -294,50 +256,25 @@ class SWOTAgent(ProductionAgent):
     name = "SWOTAgent"
     department = "strategy"
     system_prompt = """You are a McKinsey-trained Strategy Consultant.
-Conduct a thorough SWOT analysis based on market research, competitive intelligence, and financial data.
-Be specific and evidence-based — avoid generic SWOT points."""
+Conduct a thorough, evidence-based SWOT analysis.
+Structure with:
+### Strengths (Internal)
+### Weaknesses (Internal)
+### Opportunities (External)
+### Threats (External)
+### Strategic Synthesis & Risk Takeaways"""
 
     async def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
         context = context or {}
-        market = context.get("market_research", "")
-        competitor = context.get("competitor_data", "")
-        financial = context.get("financial_model", "")
+        prompt = f"""Strategy Task: {task}
 
-        prompt = f"""Task: {task}
-
-Market Research Summary:
-{market[:1500]}
-
-Competitive Landscape:
-{competitor[:1500]}
-
-Financial Model Insights:
-{financial[:1000]}
-
-Conduct a detailed SWOT analysis. Be specific and evidence-based."""
-
+Conduct a crisp, evidence-based SWOT analysis for this venture."""
         try:
-            result: SWOTOutput = await self._ainvoke_structured(prompt, SWOTOutput)
-            swot_md = f"""## SWOT Analysis
-
-**Strengths:**
-{chr(10).join(f'- {s}' for s in result.strengths)}
-
-**Weaknesses:**
-{chr(10).join(f'- {w}' for w in result.weaknesses)}
-
-**Opportunities:**
-{chr(10).join(f'- {o}' for o in result.opportunities)}
-
-**Threats:**
-{chr(10).join(f'- {t}' for t in result.threats)}
-
-{result.summary}"""
-
+            swot_md = await self._ainvoke(prompt)
             return AgentOutput(
                 agent_name=self.name, department=self.department, success=True,
                 content=swot_md,
-                metadata={"swot": result.model_dump()}
+                metadata={"swot": {"summary": swot_md}}
             )
         except Exception as e:
             return AgentOutput(
@@ -448,29 +385,38 @@ Create a complete 9-slide investor pitch deck with slide content and speaker not
 class StrategySynthesizerAgent(ProductionAgent):
     name = "StrategySynthesizerAgent"
     department = "strategy"
-    system_prompt = """You are the Lead Strategy Partner synthesizing a complete strategy package.
-Combine all research, analysis, and recommendations into a cohesive, executive-ready strategy document.
-Structure: Executive Summary → Key Findings → Strategic Recommendations → Implementation Roadmap → Financial Outlook.
-Be decisive — give clear recommendations, not wishy-washy "it depends" answers.
-Use Markdown with clear headers and a professional consulting tone."""
+    system_prompt = """You are the Lead Strategy Partner synthesizing a complete, investor-grade strategy package.
+Combine all research, analysis, financial projections, unit economics, SWOT, and strategic dimensions into a cohesive, executive-ready strategy document.
+Ensure all requested dimensions are fully detailed:
+- TAM, SAM, and SOM (distinguishing verified data vs assumptions)
+- Competitive landscape & whitespace
+- Evidence-based SWOT analysis
+- 3-Year financial projections & profitability
+- Unit economics (CAC, LTV, Gross Margin, Payback Period)
+- Go-to-market (GTM) & product differentiation strategy
+- Key risks & mitigation playbook
+- 3-Year strategic execution roadmap
+- 9-Slide investor pitch deck (with headlines, bullets, and speaker notes if requested)
+
+Format with clean Markdown, tables, and consulting-grade executive structure."""
 
     async def execute(self, task: str, context: Dict[str, Any] = None) -> AgentOutput:
         context = context or {}
         ctx_summary = {
-            "market_research": (context.get("market_research") or "")[:1500],
-            "competitor_data": (context.get("competitor_data") or "")[:1500],
-            "financial_model": (context.get("financial_model") or "")[:1000],
+            "market_research": (context.get("market_research") or "")[:2500],
+            "competitor_data": (context.get("competitor_data") or "")[:2500],
+            "financial_model": (context.get("financial_model") or "")[:2500],
             "swot_analysis": context.get("swot_analysis", {}),
-            "business_plan": (context.get("business_plan") or "")[:1000],
-            "pitch_deck": (context.get("pitch_deck") or "")[:500],
+            "business_plan": (context.get("business_plan") or "")[:1500],
+            "pitch_deck": (context.get("pitch_deck") or "")[:1000],
         }
 
         prompt = f"""Strategy request: {task}
 
-All specialist agent outputs:
-{json.dumps(ctx_summary, indent=2, default=str)[:6000]}
+All specialist agent research & model outputs:
+{json.dumps(ctx_summary, indent=2, default=str)[:8000]}
 
-Synthesize everything into a final, executive-ready strategy document with clear recommendations."""
+Synthesize everything into a comprehensive, executive-ready master strategy report covering all requested strategic pillars, projections, unit economics, GTM, and the pitch deck."""
 
         try:
             synthesis = await self._ainvoke(prompt)

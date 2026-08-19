@@ -1,5 +1,6 @@
-from typing import Any, Dict, List
+from typing import Annotated, Any, Dict, List
 from typing_extensions import TypedDict
+from shared.state_utils import merge_events
 
 
 class DocumentDeptState(TypedDict):
@@ -11,7 +12,7 @@ class DocumentDeptState(TypedDict):
     user_id: str
     api_keys: Dict[str, str]
     selected_model: str
-    events: List[Dict[str, Any]]
+    events: Annotated[List[Dict[str, Any]], merge_events]
     
     # Outputs
     final_answer: str

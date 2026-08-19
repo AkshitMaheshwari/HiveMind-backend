@@ -132,3 +132,26 @@ CREATE POLICY "Users can insert task_events" ON public.task_events
             AND (public.tasks.user_id = auth.uid() OR public.is_admin())
         )
     );
+
+
+-- 6. Audit Logs Table (Optional persistent audit records)
+CREATE TABLE IF NOT EXISTS public.audit_logs (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    user_id TEXT NOT NULL DEFAULT 'anonymous',
+    event_type TEXT NOT NULL,
+    department TEXT DEFAULT NULL,
+    agent TEXT DEFAULT NULL,
+    data JSONB DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Admins can view audit_logs" ON public.audit_logs;
+CREATE POLICY "Admins can view audit_logs" ON public.audit_logs
+    FOR SELECT USING (public.is_admin());
+
+DROP POLICY IF EXISTS "Allow service role or users to insert audit_logs" ON public.audit_logs;
+CREATE POLICY "Allow service role or users to insert audit_logs" ON public.audit_logs
+    FOR INSERT WITH CHECK (true);
+

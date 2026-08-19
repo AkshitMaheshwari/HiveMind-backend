@@ -31,8 +31,8 @@ class RouterDecision(BaseModel):
 
 
 def get_gemini_vision_model():
-    # Gemini 2.5 Flash handles both text and multimodal vision
-    return ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
+    # Gemini 3.7 Flash handles both text and multimodal vision
+    return ChatGoogleGenerativeAI(model="gemini-3.7-flash", temperature=0)
 
 def uiux_router_node(state: UIUXState):
     """Replaces the root_agent Coordinator. Decides if this is a new analysis, an edit, or info."""

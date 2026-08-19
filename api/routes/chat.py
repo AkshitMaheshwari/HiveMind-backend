@@ -91,16 +91,13 @@ async def run_task_async(
             "error": None,
         }
         final_state = initial_state
-        seen_events = 0
-
         async for chunk in compiled_graph.astream(initial_state):
             # chunk is a dict mapping node names to their state updates
             for node_name, node_state in chunk.items():
-                if "agent_events" in node_state:
-                    current_events = node_state["agent_events"]
-                    new_events = current_events[seen_events:]
-                    if new_events:
-                        for ev in new_events:
+                if "agent_events" in node_state and node_state["agent_events"]:
+                    node_events = node_state["agent_events"]
+                    for ev in node_events:
+                        try:
                             await db_service.save_event(
                                 task_id=task_id,
                                 event_type=ev.get("event", "event"),
@@ -108,8 +105,9 @@ async def run_task_async(
                                 agent=ev.get("agent"),
                                 data=ev.get("data"),
                             )
-                        await manager.send_events(task_id, new_events)
-                        seen_events = len(current_events)
+                        except Exception:
+                            pass
+                    await manager.send_events(task_id, node_events)
                 
                 # Update final_state with the latest chunk
                 final_state.update(node_state)

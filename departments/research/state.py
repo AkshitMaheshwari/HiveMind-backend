@@ -1,8 +1,9 @@
 """
 Research Department State — flows through the Research subgraph.
 """
-from typing import Any, Dict, List, Optional
+from typing import Annotated, Any, Dict, List, Optional
 from typing_extensions import TypedDict
+from shared.state_utils import merge_events
 
 
 class ResearchDeptState(TypedDict):
@@ -31,4 +32,4 @@ class ResearchDeptState(TypedDict):
     final_research: str                # Final polished research output
 
     # ── Events ─────────────────────────────────────────────────────
-    events: List[Dict[str, Any]]       # Events to bubble up to orchestrator
+    events: Annotated[List[Dict[str, Any]], merge_events]       # Events to bubble up to orchestrator

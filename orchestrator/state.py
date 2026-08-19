@@ -2,8 +2,9 @@
 Master state schema for the Universal Multi-Agent Orchestrator.
 This state flows through the entire root LangGraph.
 """
-from typing import Any, Dict, List, Optional
+from typing import Annotated, Any, Dict, List, Optional
 from typing_extensions import TypedDict
+from shared.state_utils import merge_events, merge_dicts, merge_lists
 
 
 class TaskPlan(TypedDict):
@@ -34,7 +35,7 @@ class OrchestratorState(TypedDict):
     conversation_id: str
     user_id: str
     api_keys: Optional[Dict[str, str]]
-    selected_model: Optional[str]  # e.g. "gemini-2.0-flash", "openai/gpt-oss-120b"
+    selected_model: Optional[str]  # e.g. "gemini-3.6-flash", "openai/gpt-oss-120b"
 
     # ── Conversation Memory ────────────────────────────────────────
     # List of prior turns: [{"role": "user"|"assistant", "content": "..."}]
@@ -44,13 +45,13 @@ class OrchestratorState(TypedDict):
     # ── CEO Routing ────────────────────────────────────────────────
     task_plan: Optional[Dict[str, Any]]       # CEO's JSON task plan
     active_departments: List[str]             # departments to run
-    completed_departments: List[str]          # departments that finished
+    completed_departments: Annotated[List[str], merge_lists]  # departments that finished
 
     # ── Department Outputs ─────────────────────────────────────────
-    department_outputs: Dict[str, Any]        # {"research": "...", "content": "..."}
+    department_outputs: Annotated[Dict[str, Any], merge_dicts]  # {"research": "...", "content": "..."}
 
     # ── Streaming Events ───────────────────────────────────────────
-    agent_events: List[Dict[str, Any]]        # All events for WebSocket stream
+    agent_events: Annotated[List[Dict[str, Any]], merge_events]  # All events for WebSocket stream
 
     # ── Output ─────────────────────────────────────────────────────
     final_output: str

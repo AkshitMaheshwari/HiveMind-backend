@@ -1,8 +1,9 @@
 """
 Analytics Department State — flows through the Analytics subgraph.
 """
-from typing import Any, Dict, List, Optional
+from typing import Annotated, Any, Dict, List, Optional
 from typing_extensions import TypedDict
+from shared.state_utils import merge_events
 
 
 class AnalyticsDeptState(TypedDict):
@@ -26,4 +27,4 @@ class AnalyticsDeptState(TypedDict):
     analysis_result: str                # Final combined output for the orchestrator
 
     # ── Streaming ──────────────────────────────────────────────────
-    events: List[Dict[str, Any]]
+    events: Annotated[List[Dict[str, Any]], merge_events]

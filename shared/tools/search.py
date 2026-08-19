@@ -229,14 +229,24 @@ def web_search(query: str, max_results: int = 5) -> str:
                 exc,
             )
 
-    # Fallback: DuckDuckGo
+    # Fallback: DuckDuckGo with strict timeout
     try:
+        import concurrent.futures
         from langchain_community.tools import DuckDuckGoSearchRun  # type: ignore[import]
-        tool = DuckDuckGoSearchRun()
-        return tool.invoke(query)
+
+        def _do_ddg():
+            tool = DuckDuckGoSearchRun()
+            return tool.invoke(query)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(_do_ddg)
+            return future.result(timeout=6)
+    except concurrent.futures.TimeoutError:
+        logger.warning(f"web_search DuckDuckGo timed out after 6s for query: {query}")
+        return f"Market web search timed out. Proceeding with LLM domain knowledge for '{query}'."
     except Exception as exc:
         logger.error("web_search DuckDuckGo fallback failed: query=%r error=%s", query, exc)
-        return f"Web search failed (both Tavily and DuckDuckGo unavailable): {exc}"
+        return f"Web search unavailable: {exc}"
 
 
 # ─── Raw web content ──────────────────────────────────────────────────────────

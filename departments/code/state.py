@@ -1,8 +1,9 @@
 """
 Code Department State
 """
-from typing import Any, Dict, List, Optional
+from typing import Annotated, Any, Dict, List, Optional
 from typing_extensions import TypedDict
+from shared.state_utils import merge_events
 
 
 class CodeDeptState(TypedDict):
@@ -29,4 +30,4 @@ class CodeDeptState(TypedDict):
     final_report: str
 
     # ── Events ─────────────────────────────────────────────────────
-    events: List[Dict[str, Any]]
+    events: Annotated[List[Dict[str, Any]], merge_events]

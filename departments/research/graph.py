@@ -1,9 +1,11 @@
 """
 Research Department LangGraph subgraph.
-Flow: web_search_node → fact_checker_node → synthesizer_node → [done]
+Clean synchronized flow:
+  START → research_router_node → research_sources_node → fact_checker_node → synthesizer_node → END
 """
+import asyncio
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from langgraph.graph import StateGraph, START, END
 
@@ -46,72 +48,79 @@ def _emit(state: ResearchDeptState, event: str, agent: str, data: str = "") -> l
 
 # ─── Graph Nodes ──────────────────────────────────────────────────────────────
 
-async def arxiv_node(state: ResearchDeptState) -> Dict[str, Any]:
-    """Arxiv Research Agent — searches arXiv for scientific preprints and papers."""
-    arxiv_agent, _, _, _, _, _ = _make_agents(state.get("api_keys"), state.get("selected_model"))
+async def research_router_node(state: ResearchDeptState) -> Dict[str, Any]:
+    """Router Agent — decides which sources to search based on the query."""
+    _, _, _, _, _, router_agent = _make_agents(state.get("api_keys"), state.get("selected_model"))
 
-    events = _emit(state, "agent_working", "ArxivResearchAgent", "Searching arXiv scientific papers...")
-    output = await arxiv_agent.execute(state["task"])
+    events = _emit(state, "agent_working", "ResearchRouterAgent", "Analyzing query to route to appropriate knowledge sources...")
+    output = await router_agent.execute(state["task"])
+    
+    sources = output.metadata.get("sources", ["web_search_node"])
+    reasoning = output.metadata.get("reasoning", "")
 
     events = _emit(
         {**state, "events": events},
         "agent_done",
-        "ArxivResearchAgent",
-        "arXiv paper analysis complete",
+        "ResearchRouterAgent",
+        f"Selected sources: {', '.join(sources)}. Reasoning: {reasoning}",
     )
 
     return {
-        "arxiv_evidence": output.metadata.get("evidence", []),
+        "active_sources": sources,
+        "routing_reasoning": reasoning,
         "events": events,
     }
 
 
-async def wikipedia_node(state: ResearchDeptState) -> Dict[str, Any]:
-    """Wikipedia Agent — searches Wikipedia for background domain context."""
-    _, wikipedia_agent, _, _, _, _ = _make_agents(state.get("api_keys"), state.get("selected_model"))
+async def research_sources_node(state: ResearchDeptState) -> Dict[str, Any]:
+    """Runs all selected research sources concurrently and aggregates evidence."""
+    arxiv_agent, wiki_agent, web_agent, _, _, _ = _make_agents(state.get("api_keys"), state.get("selected_model"))
+    sources = state.get("active_sources", ["web_search_node"])
+    events = list(state.get("events", []))
 
-    events = _emit(state, "agent_working", "WikipediaAgent", "Searching Wikipedia knowledge base...")
-    output = await wikipedia_agent.execute(state["task"])
+    tasks = {}
+    if "arxiv_node" in sources:
+        events.append({"event": "agent_working", "department": "research", "agent": "ArxivResearchAgent", "data": "Searching arXiv papers...", "timestamp": datetime.utcnow().isoformat()})
+        tasks["arxiv"] = arxiv_agent.execute(state["task"])
+    if "wikipedia_node" in sources:
+        events.append({"event": "agent_working", "department": "research", "agent": "WikipediaAgent", "data": "Searching Wikipedia...", "timestamp": datetime.utcnow().isoformat()})
+        tasks["wiki"] = wiki_agent.execute(state["task"])
+    if "web_search_node" in sources or not tasks:
+        events.append({"event": "agent_working", "department": "research", "agent": "WebSearchAgent", "data": "Searching web intelligence...", "timestamp": datetime.utcnow().isoformat()})
+        tasks["web"] = web_agent.execute(state["task"])
 
-    events = _emit(
-        {**state, "events": events},
-        "agent_done",
-        "WikipediaAgent",
-        "Wikipedia background search complete",
-    )
+    results = await asyncio.gather(*tasks.values(), return_exceptions=True)
+    task_keys = list(tasks.keys())
 
-    return {
-        "wikipedia_evidence": output.metadata.get("evidence", []),
-        "events": events,
-    }
+    arxiv_ev = []
+    wiki_ev = []
+    web_ev = []
+    search_results = ""
+    draft_answer = ""
 
+    for idx, key in enumerate(task_keys):
+        res = results[idx]
+        if isinstance(res, Exception):
+            continue
+        if key == "arxiv":
+            arxiv_ev = res.metadata.get("evidence", [])
+        elif key == "wiki":
+            wiki_ev = res.metadata.get("evidence", [])
+        elif key == "web":
+            web_ev = res.metadata.get("evidence", [])
+            search_results = res.metadata.get("raw_results", "")
+            draft_answer = res.content
 
-
-async def web_search_node(state: ResearchDeptState) -> Dict[str, Any]:
-    """Web Search Agent — finds real-time web intelligence and documentation."""
-    _, _, web_search_agent, _, _, _ = _make_agents(state.get("api_keys"), state.get("selected_model"))
-
-    events = _emit(state, "agent_working", "WebSearchAgent", "Searching web and technical docs...")
-    output = await web_search_agent.execute(state["task"])
-
-    events = _emit(
-        {**state, "events": events},
-        "agent_done",
-        "WebSearchAgent",
-        "Web intelligence search complete",
-    )
-
-    # Combine evidence lists
-    arxiv_ev = state.get("arxiv_evidence", [])
-    wiki_ev = state.get("wikipedia_evidence", [])
-    web_ev = output.metadata.get("evidence", [])
     all_evidence = arxiv_ev + wiki_ev + web_ev
+    events.append({"event": "agent_done", "department": "research", "agent": "WebSearchAgent", "data": "Knowledge source aggregation complete", "timestamp": datetime.utcnow().isoformat()})
 
     return {
-        "search_results": output.metadata.get("raw_results", ""),
+        "arxiv_evidence": arxiv_ev,
+        "wikipedia_evidence": wiki_ev,
         "web_evidence": web_ev,
         "evidence": all_evidence,
-        "draft_answer": output.content,
+        "search_results": search_results,
+        "draft_answer": draft_answer,
         "events": events,
     }
 
@@ -150,7 +159,6 @@ async def synthesizer_node(state: ResearchDeptState) -> Dict[str, Any]:
 
     events = _emit(state, "agent_working", "SummarizerAgent", "Synthesizing Deep Research Report...")
 
-    # Formulate contextual drafts
     arxiv_text = "\n".join([f"• [{e.get('source')}]: {e.get('summary')}" for e in state.get("arxiv_evidence", [])])
     wiki_text = "\n".join([f"• [{e.get('source')}]: {e.get('summary')}" for e in state.get("wikipedia_evidence", [])])
 
@@ -178,67 +186,26 @@ async def synthesizer_node(state: ResearchDeptState) -> Dict[str, Any]:
     }
 
 
-async def research_router_node(state: ResearchDeptState) -> Dict[str, Any]:
-    """Router Agent — decides which sources to search based on the query."""
-    _, _, _, _, _, router_agent = _make_agents(state.get("api_keys"), state.get("selected_model"))
-
-    events = _emit(state, "agent_working", "ResearchRouterAgent", "Analyzing query to route to appropriate knowledge sources...")
-    output = await router_agent.execute(state["task"])
-    
-    sources = output.metadata.get("sources", ["web_search_node"])
-    reasoning = output.metadata.get("reasoning", "")
-
-    events = _emit(
-        {**state, "events": events},
-        "agent_done",
-        "ResearchRouterAgent",
-        f"Selected sources: {', '.join(sources)}. Reasoning: {reasoning}",
-    )
-
-    return {
-        "active_sources": sources,
-        "routing_reasoning": reasoning,
-        "events": events,
-    }
-
-
-def route_sources(state: ResearchDeptState) -> list:
-    """Conditional edge function: returns the list of source nodes to run in parallel."""
-    sources = state.get("active_sources", [])
-    if not sources:
-        return ["web_search_node"] # Safe fallback if none selected
-    return sources
-
-
 # ─── Build the Research Subgraph ──────────────────────────────────────────────
 
-research_graph = StateGraph(ResearchDeptState)
+def build_research_graph() -> StateGraph:
+    graph = StateGraph(ResearchDeptState)
 
-research_graph.add_node("research_router_node", research_router_node)
-research_graph.add_node("arxiv_node", arxiv_node)
-research_graph.add_node("wikipedia_node", wikipedia_node)
-research_graph.add_node("web_search_node", web_search_node)
-research_graph.add_node("fact_checker_node", fact_checker_node)
-research_graph.add_node("synthesizer_node", synthesizer_node)
+    graph.add_node("research_router_node", research_router_node)
+    graph.add_node("research_sources_node", research_sources_node)
+    graph.add_node("fact_checker_node", fact_checker_node)
+    graph.add_node("synthesizer_node", synthesizer_node)
 
-research_graph.add_edge(START, "research_router_node")
+    graph.add_edge(START, "research_router_node")
+    graph.add_edge("research_router_node", "research_sources_node")
+    graph.add_edge("research_sources_node", "fact_checker_node")
+    graph.add_edge("fact_checker_node", "synthesizer_node")
+    graph.add_edge("synthesizer_node", END)
 
-# Fan-out to selected sources
-research_graph.add_conditional_edges(
-    "research_router_node", 
-    route_sources, 
-    ["arxiv_node", "wikipedia_node", "web_search_node"]
-)
+    return graph.compile()
 
-# All other sources fan-in to fact checker
-research_graph.add_edge("arxiv_node", "fact_checker_node")
-research_graph.add_edge("wikipedia_node", "fact_checker_node")
-research_graph.add_edge("web_search_node", "fact_checker_node")
 
-research_graph.add_edge("fact_checker_node", "synthesizer_node")
-research_graph.add_edge("synthesizer_node", END)
-
-research_subgraph = research_graph.compile()
+research_subgraph = build_research_graph()
 
 
 # ─── Outer node — plugs into root orchestrator graph ─────────────────────────
@@ -249,9 +216,6 @@ async def research_department_node(state: "OrchestratorState") -> Dict[str, Any]
     Extracts the research task from the CEO's plan, runs the subgraph,
     and writes results back into OrchestratorState.
     """
-    from datetime import datetime
-
-    # Find the research subtask from CEO plan
     subtasks = state.get("task_plan", {}).get("subtasks", [])
     research_task = state["user_request"]  # fallback
     for st in subtasks:
@@ -259,7 +223,6 @@ async def research_department_node(state: "OrchestratorState") -> Dict[str, Any]
             research_task = st.get("task", state["user_request"])
             break
 
-    # Emit department started event
     events = list(state.get("agent_events", []))
     events.append({
         "event": "department_started",
@@ -269,7 +232,6 @@ async def research_department_node(state: "OrchestratorState") -> Dict[str, Any]
         "timestamp": datetime.utcnow().isoformat(),
     })
 
-    # Run the subgraph
     initial_state = {
         "task": research_task,
         "original_request": state["user_request"],
@@ -281,7 +243,6 @@ async def research_department_node(state: "OrchestratorState") -> Dict[str, Any]
 
     final_state = await research_subgraph.ainvoke(initial_state)
 
-    # Merge subgraph events into orchestrator events
     events.extend(final_state.get("events", []))
     events.append({
         "event": "department_done",
@@ -291,7 +252,6 @@ async def research_department_node(state: "OrchestratorState") -> Dict[str, Any]
         "timestamp": datetime.utcnow().isoformat(),
     })
 
-    # Update department outputs and completed list
     department_outputs = dict(state.get("department_outputs", {}))
     department_outputs["research"] = final_state.get("final_research", "Research completed.")
 
@@ -304,9 +264,3 @@ async def research_department_node(state: "OrchestratorState") -> Dict[str, Any]
         "completed_departments": completed,
         "agent_events": events,
     }
-
-
-# Resolve forward reference
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
-    from orchestrator.state import OrchestratorState

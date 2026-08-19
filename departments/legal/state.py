@@ -1,6 +1,7 @@
 """Legal Department State."""
-from typing import Any, Dict, List, Optional
+from typing import Annotated, Any, Dict, List, Optional
 from typing_extensions import TypedDict
+from shared.state_utils import merge_events
 
 class LegalDeptState(TypedDict):
     task: str
@@ -12,5 +13,4 @@ class LegalDeptState(TypedDict):
     tos_draft: str
     compliance_checklist: str
     final_legal_output: str
-    events: List[Dict[str, Any]]
-
+    events: Annotated[List[Dict[str, Any]], merge_events]

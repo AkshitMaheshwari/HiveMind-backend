@@ -57,7 +57,7 @@ async def aggregator_node(state: OrchestratorState) -> Dict[str, Any]:
                 from api.websocket.stream import manager
                 import asyncio
                 
-                chunk_size = 6  # characters per chunk
+                chunk_size = 120  # characters per chunk for high throughput and fluid rendering
                 accumulated = ""
                 for i in range(0, len(final), chunk_size):
                     accumulated += final[i:i+chunk_size]
@@ -66,7 +66,7 @@ async def aggregator_node(state: OrchestratorState) -> Dict[str, Any]:
                         "data": accumulated,
                         "timestamp": datetime.utcnow().isoformat(),
                     })
-                    await asyncio.sleep(0.012) # Small delay for smooth typing effect
+                    await asyncio.sleep(0.005)
             except Exception as e:
                 import logging
                 logging.getLogger(__name__).warning(f"Failed to artificially stream final output: {e}")

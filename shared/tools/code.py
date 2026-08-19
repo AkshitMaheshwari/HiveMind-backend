@@ -37,8 +37,9 @@ def execute_code_local(code: str, timeout: int = 90) -> Dict[str, object]:
             f.write(code)
             tmp_path = f.name
 
+        import sys
         result = subprocess.run(
-            ["python", tmp_path],
+            [sys.executable, tmp_path],
             capture_output=True,
             text=True,
             timeout=timeout,

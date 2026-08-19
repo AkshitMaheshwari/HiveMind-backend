@@ -1,6 +1,7 @@
-﻿"""Design Department state."""
-from typing import Any, Dict, List, Optional
+"""Design Department state."""
+from typing import Annotated, Any, Dict, List, Optional
 from typing_extensions import TypedDict
+from shared.state_utils import merge_events
 
 class DesignDeptState(TypedDict):
     task: str
@@ -12,4 +13,4 @@ class DesignDeptState(TypedDict):
     logo_concepts: List[str]
     visual_assets: List[str]
     final_design_package: str
-    events: List[Dict[str, Any]]
+    events: Annotated[List[Dict[str, Any]], merge_events]
