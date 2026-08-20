@@ -1,4 +1,4 @@
-﻿"""
+"""
 Design Department - Worker Agents.
 Uses DALL-E 3 image generation tool (new tool category, only dept that needs it).
 """
@@ -99,6 +99,7 @@ class DesignSynthesizerAgent(ProductionAgent):
         parts = [f"# Design Package: {task}\n"]
         if context.get("branding_guide"): parts.append(f"## Brand Identity\n{context['branding_guide']}\n")
         if context.get("logo_concepts"): parts.append(f"## Logo Concepts\n{chr(10).join(context['logo_concepts'])}\n")
+        if context.get("pitch_visuals"): parts.append(f"## Pitch Deck Visuals\n{context['pitch_visuals']}\n")
         if context.get("visual_assets"): parts.append(f"## Visual Assets\n{chr(10).join(context['visual_assets'])}\n")
         package = "\n".join(parts)
         try:
@@ -106,3 +107,4 @@ class DesignSynthesizerAgent(ProductionAgent):
             return AgentOutput(agent_name=self.name, department=self.department, success=True, content=final, metadata={})
         except Exception as e:
             return AgentOutput(agent_name=self.name, department=self.department, success=True, content=package, error=str(e), metadata={})
+

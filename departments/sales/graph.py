@@ -1,4 +1,4 @@
-﻿"""Sales Department LangGraph subgraph."""
+"""Sales Department LangGraph subgraph."""
 from datetime import datetime
 from typing import Any, Dict
 from langgraph.graph import StateGraph, START, END
@@ -65,7 +65,6 @@ def build_sales_graph():
         b.add_node(n, f)
     b.add_edge(START,"router_node")
     b.add_edge("router_node","lead_research_node")
-    b.add_edge("router_node","cold_email_node")
     b.add_edge("lead_research_node","cold_email_node")
     b.add_edge("cold_email_node","followup_node")
     b.add_edge("followup_node","synth_node")

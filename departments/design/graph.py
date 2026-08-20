@@ -1,4 +1,4 @@
-﻿"""Design Department LangGraph subgraph."""
+"""Design Department LangGraph subgraph."""
 from datetime import datetime
 from typing import Any, Dict, List
 from langgraph.graph import StateGraph, START, END
@@ -43,12 +43,12 @@ async def logo_node(state):
     return {"logo_concepts":[o.content],"visual_assets":urls,"events":evs}
 
 async def pitch_visuals_node(state):
-    if "pitch_visuals" not in state.get("required_agents",[]): return {"events":state.get("events",[])}
+    if "pitch_visuals" not in state.get("required_agents",[]): return {"pitch_visuals":"","events":state.get("events",[])}
     a = _make(state.get("api_keys"),state.get("selected_model"))
     evs = _emit(state,"agent_working","PitchVisualsAgent","Creating visual directions...")
     o = await a["pitch"].execute(state["task"], context={"branding_guide":state.get("branding_guide","")})
     evs = _emit({**state,"events":evs},"agent_done","PitchVisualsAgent","Pitch visuals ready")
-    return {"logo_concepts":state.get("logo_concepts",[])+[o.content],"events":evs}
+    return {"pitch_visuals":o.content,"events":evs}
 
 async def synth_node(state):
     a = _make(state.get("api_keys"),state.get("selected_model"))
@@ -56,7 +56,8 @@ async def synth_node(state):
     o = await a["synth"].execute(state["task"], context={
         "branding_guide":state.get("branding_guide",""),
         "logo_concepts":state.get("logo_concepts",[]),
-        "visual_assets":state.get("visual_assets",[])})
+        "visual_assets":state.get("visual_assets",[]),
+        "pitch_visuals":state.get("pitch_visuals","")})
     evs = _emit({**state,"events":evs},"agent_done","DesignSynthesizerAgent","Design package ready")
     return {"final_design_package":o.content,"events":evs}
 
@@ -87,7 +88,7 @@ async def design_department_node(state) -> Dict[str, Any]:
     final = await design_subgraph.ainvoke({
         "task":task,"required_agents":[],"user_id":state.get("user_id"),
         "api_keys":state.get("api_keys"),"selected_model":state.get("selected_model"),
-        "branding_guide":"","logo_concepts":[],"visual_assets":[],"final_design_package":"","events":[]})
+        "branding_guide":"","logo_concepts":[],"visual_assets":[],"pitch_visuals":"","final_design_package":"","events":[]})
     evs.extend(final.get("events",[]))
     evs.append({"event":"department_done","department":"design","agent":"Design Head",
                 "data":"Design complete","timestamp":datetime.utcnow().isoformat()})
