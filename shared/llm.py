@@ -2,6 +2,7 @@
 Centralized dynamic LLM factory for the Universal Multi-Agent Orchestrator.
 Supports user-provided Gemini, OpenAI, or Groq API keys with automatic fallback.
 """
+import hashlib
 import os
 import logging
 from typing import Dict, Optional
@@ -9,6 +10,21 @@ from dotenv import load_dotenv
 
 load_dotenv()
 logger = logging.getLogger("llm_factory")
+
+# ─── Module-level LLM Instance Cache ─────────────────────────────────────────
+# Keyed on (api_key_hash, model_id, temperature) so LLM HTTP clients are
+# created once per process and reused across all _make_agents() calls.
+# This eliminates the 85-130s per-node overhead caused by re-instantiation.
+_LLM_CACHE: Dict[str, "ResilientLLM"] = {}
+
+
+def _cache_key(api_keys: Dict, model_type: str, selected_model: Optional[str]) -> str:
+    """Stable cache key from api key fingerprints + model selection."""
+    google = (api_keys.get("google_api_key") or os.getenv("GOOGLE_API_KEY") or "")[-8:]
+    groq   = (api_keys.get("groq_api_key")   or os.getenv("GROQ_API_KEY")   or "")[-8:]
+    openai = (api_keys.get("openai_api_key") or os.getenv("OPENAI_API_KEY") or "")[-8:]
+    raw = f"{google}|{groq}|{openai}|{model_type}|{selected_model or ''}"
+    return hashlib.md5(raw.encode()).hexdigest()
 
 
 # ─── Model Registry ───────────────────────────────────────────────────────────
@@ -131,6 +147,7 @@ def get_llm(
     api_keys: Optional[Dict[str, str]] = None,
     model_type: str = "general",
     selected_model: Optional[str] = None,
+    bypass_cache: bool = False,
 ):
     """
     Builds a ResilientLLM chain based on user-provided keys or system defaults.
@@ -141,13 +158,19 @@ def get_llm(
     api_keys = api_keys or {}
     temp = 0.2 if model_type in ("routing", "verification") else 0.4
 
+    # ── Cache lookup — skip build if we already have a live LLM for this config ─
+    if not bypass_cache:
+        key = _cache_key(api_keys, model_type, selected_model)
+        if key in _LLM_CACHE:
+            return _LLM_CACHE[key]
+
     # ── User selected a specific model ─────────────────────────────────────────
     if selected_model:
         provider = get_provider_for_model(selected_model)
 
         if provider == "gemini":
-            key = api_keys.get("google_api_key") or os.getenv("GOOGLE_API_KEY")
-            if key and not key.startswith("your-"):
+            api_key = api_keys.get("google_api_key") or os.getenv("GOOGLE_API_KEY")
+            if api_key and not api_key.startswith("your-"):
                 models_to_try = [selected_model]
                 # Add stable fallback models if primary model encounters 504 / quota issues
                 for fallback in ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-3.6-flash"]:
@@ -156,15 +179,19 @@ def get_llm(
                 candidates = []
                 for m in models_to_try:
                     try:
-                        candidates.append(_build_gemini(m, key, temp))
+                        candidates.append(_build_gemini(m, api_key, temp))
                     except Exception as e:
                         logger.warning(f"Failed to build Gemini candidate '{m}': {e}")
                 if candidates:
-                    return ResilientLLM(candidates)
+                    llm = ResilientLLM(candidates)
+                    if not bypass_cache:
+                        key = _cache_key(api_keys, model_type, selected_model)
+                        _LLM_CACHE[key] = llm
+                    return llm
 
         elif provider == "groq":
-            key = api_keys.get("groq_api_key") or os.getenv("GROQ_API_KEY")
-            if key and not key.startswith("your-"):
+            api_key = api_keys.get("groq_api_key") or os.getenv("GROQ_API_KEY")
+            if api_key and not api_key.startswith("your-"):
                 models_to_try = [selected_model]
                 for fallback in ["openai/gpt-oss-120b", "openai/gpt-oss-20b"]:
                     if fallback not in models_to_try:
@@ -172,15 +199,19 @@ def get_llm(
                 candidates = []
                 for m in models_to_try:
                     try:
-                        candidates.append(_build_groq(m, key, temp))
+                        candidates.append(_build_groq(m, api_key, temp))
                     except Exception as e:
                         logger.warning(f"Failed to build Groq candidate '{m}': {e}")
                 if candidates:
-                    return ResilientLLM(candidates)
+                    llm = ResilientLLM(candidates)
+                    if not bypass_cache:
+                        key = _cache_key(api_keys, model_type, selected_model)
+                        _LLM_CACHE[key] = llm
+                    return llm
 
         elif provider == "openai":
-            key = api_keys.get("openai_api_key") or os.getenv("OPENAI_API_KEY")
-            if key and key.startswith("sk-"):
+            api_key = api_keys.get("openai_api_key") or os.getenv("OPENAI_API_KEY")
+            if api_key and api_key.startswith("sk-"):
                 models_to_try = [selected_model]
                 for fallback in ["gpt-4o", "gpt-4o-mini"]:
                     if fallback not in models_to_try:
@@ -188,11 +219,15 @@ def get_llm(
                 candidates = []
                 for m in models_to_try:
                     try:
-                        candidates.append(_build_openai(m, key, temp))
+                        candidates.append(_build_openai(m, api_key, temp))
                     except Exception as e:
                         logger.warning(f"Failed to build OpenAI candidate '{m}': {e}")
                 if candidates:
-                    return ResilientLLM(candidates)
+                    llm = ResilientLLM(candidates)
+                    if not bypass_cache:
+                        key = _cache_key(api_keys, model_type, selected_model)
+                        _LLM_CACHE[key] = llm
+                    return llm
 
         logger.warning(
             f"Selected model '{selected_model}' could not be initialized "
@@ -228,7 +263,10 @@ def get_llm(
             logger.warning(f"OpenAI initialization error: {e}")
 
     if candidates:
-        return ResilientLLM(candidates)
+        llm = ResilientLLM(candidates)
+        if not bypass_cache:
+            _LLM_CACHE[key] = llm
+        return llm
 
     raise ValueError("No valid API key available! Please enter a Gemini, OpenAI, or Groq API key in Settings.")
 

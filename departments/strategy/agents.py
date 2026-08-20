@@ -150,7 +150,9 @@ Provide a competitive analysis covering:
 class FinancialModelerAgent(ProductionAgent):
     """
     Uses the shared Code sandbox (execute_code) for financial projections.
-    This is another key hive-mind reuse: Code dept's sandbox serves Strategy dept.
+    Financial parameters are derived from the actual task context via LLM
+    to prevent domain drift (e.g., Indian EdTech B2C getting hardcoded
+    enterprise SaaS defaults that led to the 'Project Horizon' hallucination).
     """
     name = "FinancialModelerAgent"
     department = "strategy"
@@ -163,18 +165,69 @@ Use realistic assumptions based on the market context provided."""
         context = context or {}
         market_data = context.get("market_research", "")
 
+        # ── Step 1: Extract domain-aware parameters from context via LLM ─────────
+        # This prevents the hardcoded enterprise SaaS defaults from causing
+        # domain drift when the actual task is B2C EdTech, HealthTech, etc.
+        params_prompt = f"""You are a financial analyst. Given the business context below, extract realistic financial model parameters.
+
+Business task: {task[:500]}
+
+Market context: {market_data[:800] if market_data else "Not provided"}
+
+Return a JSON object with ONLY these keys (no extra text, just valid JSON):
+{{
+  "year1_customers": <integer, realistic starting user/customer count>,
+  "monthly_growth_rate": <float 0.05-0.30, monthly growth rate>,
+  "arpu_monthly": <float, average revenue per user per month in USD>,
+  "churn_monthly": <float 0.01-0.10, monthly churn rate>,
+  "cac": <float, customer acquisition cost in USD>,
+  "gross_margin": <float 0.50-0.90, gross margin ratio>,
+  "operating_costs_monthly": <float, monthly fixed operating costs in USD>,
+  "currency_label": <string, e.g. "INR" or "USD" or "GBP">
+}}
+
+IMPORTANT: Match the scale to the business type. 
+- Indian B2C EdTech (students): arpu_monthly ~3-10, year1_customers 5000-20000, cac 5-15
+- Indian B2B SaaS: arpu_monthly 50-200, year1_customers 20-100, cac 200-800
+- Global Enterprise SaaS: arpu_monthly 500-5000, year1_customers 10-50, cac 5000-20000
+- Consumer App (free with premium): arpu_monthly 2-8, year1_customers 10000-100000"""
+
+        try:
+            params_raw = await self._ainvoke(params_prompt)
+            import json as _json
+            # Extract JSON from response
+            json_start = params_raw.find('{')
+            json_end = params_raw.rfind('}') + 1
+            if json_start >= 0 and json_end > json_start:
+                params = _json.loads(params_raw[json_start:json_end])
+            else:
+                raise ValueError("No JSON found in params response")
+        except Exception as e:
+            # Fallback to generic consumer/SMB defaults if LLM extraction fails
+            params = {
+                "year1_customers": 500,
+                "monthly_growth_rate": 0.12,
+                "arpu_monthly": 15,
+                "churn_monthly": 0.05,
+                "cac": 50,
+                "gross_margin": 0.75,
+                "operating_costs_monthly": 15000,
+                "currency_label": "USD",
+            }
+
+        # ── Step 2: Run financial model with domain-extracted parameters ──────────
         code = f"""
 import json
 
-# Simple 3-year SaaS financial model
 assumptions = {{
-    "year1_customers": 50,
-    "monthly_growth_rate": 0.15,  # 15% MoM growth
-    "arpu_monthly": 200,          # Average Revenue Per User
-    "churn_monthly": 0.05,        # 5% monthly churn
-    "cac": 500,                   # Customer Acquisition Cost
-    "gross_margin": 0.75,         # 75% gross margin typical SaaS
-    "operating_costs_monthly": 50000  # Fixed costs
+    "year1_customers": {int(params.get("year1_customers", 500))},
+    "monthly_growth_rate": {float(params.get("monthly_growth_rate", 0.12))},
+    "arpu_monthly": {float(params.get("arpu_monthly", 15))},
+    "churn_monthly": {float(params.get("churn_monthly", 0.05))},
+    "cac": {float(params.get("cac", 50))},
+    "gross_margin": {float(params.get("gross_margin", 0.75))},
+    "operating_costs_monthly": {float(params.get("operating_costs_monthly", 15000))},
+    "currency_label": "{params.get('currency_label', 'USD')}"
 }}
 
 results = []
@@ -182,11 +235,11 @@ customers = assumptions["year1_customers"]
 for month in range(1, 37):  # 36 months = 3 years
     revenue = customers * assumptions["arpu_monthly"]
     gross_profit = revenue * assumptions["gross_margin"]
-    operating_loss = gross_profit - assumptions["operating_costs_monthly"]
+    operating_pnl = gross_profit - assumptions["operating_costs_monthly"]
     new_customers = int(customers * assumptions["monthly_growth_rate"])
     churned = int(customers * assumptions["churn_monthly"])
     customers = customers + new_customers - churned
-    
+
     if month in [12, 24, 36]:
         results.append({{
             "period": f"Year {{month // 12}}",
@@ -194,28 +247,25 @@ for month in range(1, 37):  # 36 months = 3 years
             "annual_revenue": round(revenue * 12, 0),
             "customers": customers,
             "gross_margin_pct": assumptions["gross_margin"] * 100,
-            "monthly_operating_pnl": round(operating_loss, 0)
+            "monthly_operating_pnl": round(operating_pnl, 0),
         }})
 
-# Unit economics
 ltv = (assumptions["arpu_monthly"] * assumptions["gross_margin"]) / assumptions["churn_monthly"]
-cac = assumptions["cac"]
-ltv_cac_ratio = ltv / cac
-
-break_even_customers = assumptions["operating_costs_monthly"] / (
-    assumptions["arpu_monthly"] * assumptions["gross_margin"]
-)
+ltv_cac = ltv / assumptions["cac"]
+payback = assumptions["cac"] / (assumptions["arpu_monthly"] * assumptions["gross_margin"])
+break_even = assumptions["operating_costs_monthly"] / (assumptions["arpu_monthly"] * assumptions["gross_margin"])
 
 output = {{
     "projections": results,
     "unit_economics": {{
         "LTV": round(ltv, 0),
-        "CAC": cac,
-        "LTV_CAC_ratio": round(ltv_cac_ratio, 2),
-        "payback_months": round(cac / (assumptions["arpu_monthly"] * assumptions["gross_margin"]), 1)
+        "CAC": assumptions["cac"],
+        "LTV_CAC_ratio": round(ltv_cac, 2),
+        "payback_months": round(payback, 1),
+        "currency": assumptions["currency_label"],
     }},
-    "break_even_customers": round(break_even_customers, 0),
-    "assumptions": assumptions
+    "break_even_customers": round(break_even, 0),
+    "assumptions": assumptions,
 }}
 print(json.dumps(output))
 """
@@ -229,19 +279,20 @@ print(json.dumps(output))
 
             prompt = f"""Strategy context: {task}
 
-Financial model results:
+Financial model results (domain-calibrated parameters):
 {json.dumps(model_data, indent=2, default=str)[:3000]}
 
 Market context:
 {market_data[:1000]}
 
-Interpret these financial projections in the context of the strategy. 
-Highlight: Year 3 revenue potential, LTV:CAC health, break-even timeline, and key financial risks."""
+Interpret these financial projections in the context of the actual business described.
+Highlight: Year 3 revenue potential, LTV:CAC health, break-even timeline, and key financial risks.
+Use the correct currency ({params.get('currency_label', 'USD')}) throughout."""
 
             narrative = await self._ainvoke(prompt)
             return AgentOutput(
                 agent_name=self.name, department=self.department, success=True,
-                content=narrative, metadata={"model_data": model_data}
+                content=narrative, metadata={"model_data": model_data, "params_used": params}
             )
         except Exception as e:
             return AgentOutput(
