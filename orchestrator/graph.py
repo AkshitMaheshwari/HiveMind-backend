@@ -140,6 +140,12 @@ def route_after_ceo(state: OrchestratorState) -> str:
                 continue
             if depends is None or depends in completed:
                 return f"{dept}_department_node"
+
+        # Fallback if subtasks was empty but active departments are pending
+        pending = [d for d in active if d not in completed]
+        if pending:
+            return f"{pending[0]}_department_node"
+
         return "aggregator_node"
 
 
@@ -176,6 +182,11 @@ def route_after_department(state: OrchestratorState) -> str:
                 continue
             if depends is None or depends in completed:
                 return f"{dept}_department_node"
+
+        # Fallback if subtasks was empty but active departments are pending
+        pending = [d for d in active if d not in completed]
+        if pending:
+            return f"{pending[0]}_department_node"
 
     return "aggregator_node"
 
