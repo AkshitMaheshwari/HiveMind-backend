@@ -1,6 +1,7 @@
 """
 Code Department LangGraph subgraph.
-Flow: code_generator_node → debugger_node → doc_writer_node → [done]
+Flow: code_generator_node -> debugger_node -> doc_writer_node -> [done]
+GitHub tasks are fast-pathed directly to GitHubOpsAgent.
 """
 import asyncio
 from datetime import datetime
@@ -9,7 +10,10 @@ from typing import Any, Dict
 from langgraph.graph import StateGraph, START, END
 
 from departments.code.state import CodeDeptState
-from departments.code.agents import CodeGeneratorAgent, DebuggerAgent, DocWriterAgent, UXDesignerAgent, UIReviewerAgent
+from departments.code.agents import (
+    CodeGeneratorAgent, DebuggerAgent, DocWriterAgent,
+    UXDesignerAgent, UIReviewerAgent,
+)
 from shared.tools import execute_code
 
 
@@ -41,7 +45,7 @@ def _emit(state: CodeDeptState, event: str, agent: str, data: str = "") -> list:
 # ─── Graph Nodes ──────────────────────────────────────────────────────────────
 
 async def ux_designer_node(state: CodeDeptState) -> Dict[str, Any]:
-    """UX Designer — plans the UI/UX system if needed."""
+    """UX Designer - plans the UI/UX system if needed."""
     agents = _make_agents(state.get("api_keys"), state.get("selected_model"))
     ux_designer = agents["ux_designer"]
 
@@ -49,7 +53,7 @@ async def ux_designer_node(state: CodeDeptState) -> Dict[str, Any]:
     output = await ux_designer.execute(state["task"])
 
     is_web_ui = output.metadata.get("is_web_ui", False)
-    
+
     events = _emit(
         {**state, "events": events},
         "agent_done",
@@ -65,7 +69,7 @@ async def ux_designer_node(state: CodeDeptState) -> Dict[str, Any]:
 
 
 async def code_generator_node(state: CodeDeptState) -> Dict[str, Any]:
-    """Code Generator — writes the initial code solution."""
+    """Code Generator - writes the initial code solution."""
     agents = _make_agents(state.get("api_keys"), state.get("selected_model"))
     code_gen = agents["code_gen"]
 
@@ -73,7 +77,7 @@ async def code_generator_node(state: CodeDeptState) -> Dict[str, Any]:
 
     context = {
         "ux_design_system": state.get("ux_design_system", ""),
-        "ui_feedback": state.get("ui_feedback", "")
+        "ui_feedback": state.get("ui_feedback", ""),
     }
     output = await code_gen.execute(state["task"], context=context)
 
@@ -94,7 +98,7 @@ async def code_generator_node(state: CodeDeptState) -> Dict[str, Any]:
 
 
 async def debugger_node(state: CodeDeptState) -> Dict[str, Any]:
-    """Debugger — runs code in sandbox (Python) or verifies web code (HTML/JS/CSS)."""
+    """Debugger - runs code in sandbox (Python) or verifies web code (HTML/JS/CSS)."""
     agents = _make_agents(state.get("api_keys"), state.get("selected_model"))
     debugger = agents["debugger"]
 
@@ -103,7 +107,6 @@ async def debugger_node(state: CodeDeptState) -> Dict[str, Any]:
     code = state.get("generated_code", "")
     lang = (state.get("_language") or "python").lower()
 
-    # Skip Python interpreter execution for HTML/CSS/JS web code to prevent SyntaxError
     if lang in ["html", "css", "js", "javascript", "typescript", "xml", "svg", "web"]:
         exec_result = {
             "success": True,
@@ -117,17 +120,11 @@ async def debugger_node(state: CodeDeptState) -> Dict[str, Any]:
         {**state, "events": events},
         "agent_done",
         "DebuggerAgent",
-        "Execution: " + ("✅ Success" if exec_result["success"] else f"❌ Error: {exec_result['stderr'][:100]}"),
+        "Execution: " + ("OK" if exec_result["success"] else f"Error: {exec_result['stderr'][:100]}"),
     )
 
-    # If execution failed (for Python code), invoke debugger agent to fix
     if not exec_result["success"] and exec_result["stderr"]:
-        events = _emit(
-            {**state, "events": events},
-            "agent_working",
-            "DebuggerAgent",
-            "Fixing errors...",
-        )
+        events = _emit({**state, "events": events}, "agent_working", "DebuggerAgent", "Fixing errors...")
         debug_output = await debugger.execute(
             state["task"],
             context={
@@ -142,7 +139,7 @@ async def debugger_node(state: CodeDeptState) -> Dict[str, Any]:
             {**state, "events": events},
             "agent_done",
             "DebuggerAgent",
-            "Code fixed: " + ("✅" if debug_output.metadata.get("is_resolved") else "⚠️ Partial fix"),
+            "Code fixed: " + ("OK" if debug_output.metadata.get("is_resolved") else "Partial fix"),
         )
     else:
         fixed_code = code
@@ -157,7 +154,7 @@ async def debugger_node(state: CodeDeptState) -> Dict[str, Any]:
 
 
 async def ui_reviewer_node(state: CodeDeptState) -> Dict[str, Any]:
-    """UI Reviewer — critiques the UI/UX of web tasks."""
+    """UI Reviewer - critiques the UI/UX of web tasks."""
     if not state.get("is_web_ui_task"):
         return {"ui_approved": True, "ui_feedback": ""}
 
@@ -165,19 +162,18 @@ async def ui_reviewer_node(state: CodeDeptState) -> Dict[str, Any]:
     ui_reviewer = agents["ui_reviewer"]
 
     events = _emit(state, "agent_working", "UIReviewerAgent", "Reviewing UI aesthetics and UX...")
-    
     output = await ui_reviewer.execute(
         state["task"],
-        context={"generated_code": state.get("fixed_code") or state.get("generated_code", "")}
+        context={"generated_code": state.get("fixed_code") or state.get("generated_code", "")},
     )
 
     approved = output.metadata.get("approved", True)
-    
+
     events = _emit(
         {**state, "events": events},
         "agent_done",
         "UIReviewerAgent",
-        "UI Approved ✨" if approved else "UI Rejected ❌ (Requesting revision)",
+        "UI Approved" if approved else "UI Rejected (requesting revision)",
     )
 
     return {
@@ -188,33 +184,27 @@ async def ui_reviewer_node(state: CodeDeptState) -> Dict[str, Any]:
 
 
 async def doc_writer_node(state: CodeDeptState) -> Dict[str, Any]:
-    """Doc Writer — generates documentation or formatted web deliverable."""
+    """Doc Writer - generates documentation or formatted web deliverable."""
     agents = _make_agents(state.get("api_keys"), state.get("selected_model"))
     doc_writer = agents["doc_writer"]
 
     lang = (state.get("_language") or "python").lower()
     final_code_display = state.get("fixed_code") or state.get("generated_code", "")
 
-    # For web/UI tasks (HTML/CSS/JS), generate clean report without Python docstring clutter
     if lang in ["html", "css", "js", "javascript", "web"]:
         events = _emit(state, "agent_done", "DocWriterAgent", "Web deliverable ready")
-        final_report = f"""## 💻 Web Application Solution
-
-### Generated Code ({lang.upper()})
-
-```{lang}
-{final_code_display}
-```
-
-> 💡 **Tip:** Click the **👁️ Live Preview** tab at the top of this message (or **↗️ Fullscreen**) to view and interact with your rendered website live!
-"""
+        final_report = (
+            "## Web Application Solution\n\n"
+            f"### Generated Code ({lang.upper()})\n\n"
+            f"```{lang}\n{final_code_display}\n```\n\n"
+            "> Tip: Click the Live Preview tab to view and interact with your rendered website!\n"
+        )
         return {
             "documentation": "Web application deliverable generated successfully.",
             "final_report": final_report,
             "events": list({**state, "events": events}["events"]),
         }
 
-    # For Python or standard backend code, generate complete developer docs
     events = _emit(state, "agent_working", "DocWriterAgent", "Generating documentation...")
     output = await doc_writer.execute(
         state["task"],
@@ -225,37 +215,16 @@ async def doc_writer_node(state: CodeDeptState) -> Dict[str, Any]:
             "explanation": state.get("problem_description", ""),
         },
     )
-
-    events = _emit(
-        {**state, "events": events},
-        "agent_done",
-        "DocWriterAgent",
-        "Documentation complete",
-    )
+    events = _emit({**state, "events": events}, "agent_done", "DocWriterAgent", "Documentation complete")
 
     exec_success = state.get("execution_success", False)
-    final_report = f"""## 💻 Code Solution
-
-### Generated Code
-
-```{lang}
-{final_code_display}
-```
-
-### Execution Results
-- **Status:** {"✅ Passed" if exec_success else "⚠️ Errors encountered"}
-
-**Output:**
-```text
-{state.get("execution_stdout", "No output")[:500]}
-```
-
-{f'**Errors:**\\n```text\\n{state.get("execution_stderr", "")[:500]}\\n```' if state.get("execution_stderr") else ""}
-
-### Documentation
-
-{output.content}
-"""
+    final_report = (
+        "## Code Solution\n\n"
+        f"### Generated Code\n\n```{lang}\n{final_code_display}\n```\n\n"
+        f"### Execution Results\n- **Status:** {'Passed' if exec_success else 'Errors encountered'}\n\n"
+        f"**Output:**\n```text\n{state.get('execution_stdout', 'No output')[:500]}\n```\n\n"
+        f"### Documentation\n\n{output.content}\n"
+    )
 
     return {
         "documentation": output.content,
@@ -276,7 +245,6 @@ def route_after_ui_reviewer(state: CodeDeptState) -> str:
 # ─── Build the Code Subgraph ──────────────────────────────────────────────────
 
 code_graph = StateGraph(CodeDeptState)
-
 code_graph.add_node("ux_designer_node", ux_designer_node)
 code_graph.add_node("code_generator_node", code_generator_node)
 code_graph.add_node("debugger_node", debugger_node)
@@ -287,7 +255,6 @@ code_graph.add_edge(START, "ux_designer_node")
 code_graph.add_edge("ux_designer_node", "code_generator_node")
 code_graph.add_edge("code_generator_node", "debugger_node")
 code_graph.add_edge("debugger_node", "ui_reviewer_node")
-
 code_graph.add_conditional_edges(
     "ui_reviewer_node",
     route_after_ui_reviewer,
@@ -296,16 +263,29 @@ code_graph.add_conditional_edges(
         "doc_writer_node": "doc_writer_node",
     },
 )
-
 code_graph.add_edge("doc_writer_node", END)
 
 code_subgraph = code_graph.compile()
 
 
-# ─── Outer node — plugs into root orchestrator graph ─────────────────────────
+# ─── GitHub heuristic ────────────────────────────────────────────────────────
+
+def _is_github_task(task: str) -> bool:
+    """Returns True if the task is a GitHub repository operation."""
+    lowered = task.lower()
+    keywords = [
+        "repo", "repository", "github", "pull request",
+        "branch", "commit", "project structure", "file structure",
+        "show me the structure", "show structure", "list files",
+        "read file", "inspect my", "explore my repo",
+    ]
+    return any(kw in lowered for kw in keywords)
+
+
+# ─── Outer node (plugs into root orchestrator graph) ─────────────────────────
 
 async def code_department_node(state) -> Dict[str, Any]:
-    """Outer node that plugs into the main orchestrator graph."""
+    """Routes GitHub tasks to GitHubOpsAgent; everything else runs the normal pipeline."""
     subtasks = state.get("task_plan", {}).get("subtasks", [])
     code_task = state["user_request"]
     for st in subtasks:
@@ -318,10 +298,46 @@ async def code_department_node(state) -> Dict[str, Any]:
         "event": "department_started",
         "department": "code",
         "agent": "Code Head",
-        "data": f"Starting code task: {code_task[:100]}...",
+        "data": f"Starting: {code_task[:100]}...",
         "timestamp": datetime.utcnow().isoformat(),
     })
 
+    # ─── GitHub fast-path ─────────────────────────────────────────────────────
+    if _is_github_task(code_task):
+        events.append({
+            "event": "agent_working",
+            "department": "code",
+            "agent": "GitHubOpsAgent",
+            "data": "GitHub task detected — calling GitHubOpsAgent...",
+            "timestamp": datetime.utcnow().isoformat(),
+        })
+        from departments.code.agents import GitHubOpsAgent
+        agent = GitHubOpsAgent(
+            api_keys=state.get("api_keys"),
+            selected_model=state.get("selected_model"),
+        )
+        output = await agent.execute(code_task, context={"api_keys": state.get("api_keys")})
+        events.append({
+            "event": "agent_done",
+            "department": "code",
+            "agent": "GitHubOpsAgent",
+            "data": "GitHub operation complete",
+            "timestamp": datetime.utcnow().isoformat(),
+        })
+
+        dept_outputs = dict(state.get("department_outputs", {}))
+        dept_outputs["code"] = output.content
+        completed = list(state.get("completed_departments", []))
+        if "code" not in completed:
+            completed.append("code")
+
+        return {
+            "department_outputs": dept_outputs,
+            "completed_departments": completed,
+            "agent_events": events,
+        }
+
+    # ─── Normal code pipeline ─────────────────────────────────────────────────
     initial_state = {
         "task": code_task,
         "original_request": state["user_request"],
@@ -329,7 +345,6 @@ async def code_department_node(state) -> Dict[str, Any]:
         "selected_model": state.get("selected_model"),
         "events": [],
     }
-
     final_state = await code_subgraph.ainvoke(initial_state)
 
     events.extend(final_state.get("events", []))
@@ -337,19 +352,18 @@ async def code_department_node(state) -> Dict[str, Any]:
         "event": "department_done",
         "department": "code",
         "agent": "Code Head",
-        "data": "Code department completed successfully",
+        "data": "Code department completed",
         "timestamp": datetime.utcnow().isoformat(),
     })
 
-    department_outputs = dict(state.get("department_outputs", {}))
-    department_outputs["code"] = final_state.get("final_report", "Code generation completed.")
-
+    dept_outputs = dict(state.get("department_outputs", {}))
+    dept_outputs["code"] = final_state.get("final_report", "Code generation completed.")
     completed = list(state.get("completed_departments", []))
     if "code" not in completed:
         completed.append("code")
 
     return {
-        "department_outputs": department_outputs,
+        "department_outputs": dept_outputs,
         "completed_departments": completed,
         "agent_events": events,
     }
