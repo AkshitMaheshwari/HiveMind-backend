@@ -48,9 +48,7 @@ def _extract_body_from_payload(payload: Dict[str, Any]) -> str:
 
     if body_data:
         try:
-            # Gmail uses URL-safe base64
             decoded = base64.urlsafe_b64decode(body_data.encode("ASCII")).decode("utf-8", errors="replace")
-            # Clean HTML tags if html
             if "html" in mime_type.lower():
                 decoded = re.sub(r"<style.*?</style>", "", decoded, flags=re.DOTALL)
                 decoded = re.sub(r"<script.*?</script>", "", decoded, flags=re.DOTALL)

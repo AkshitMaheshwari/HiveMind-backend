@@ -1,4 +1,4 @@
-﻿"""
+"""
 Sales/Outreach Department - Worker Agents.
 LeadResearchAgent calls Research dept directly via inter_dept (hive-mind pattern).
 """
